@@ -24,7 +24,7 @@ Practice is in C. There is no key changer. 1645 is `I–vi–IV–V`, which is C
 
 The progression menu is ordered as an **editorial starting point for Mandopop familiarity, not a measured frequency chart.** First is 1645 (`I–vi–IV–V`, also called 1 6 4 5). Second is the descending-bass Canon (`I–V6–vi–iii6–IV–I6–ii–V`), bass C–B–A–G–F–E–D–G. After those: 6415, 1564, the Royal Road and a longer form, the root-position Canon, ii–V–I, and minor loops in C minor such as `i–VI–III–VII`, `i–iv–V–i`, and `iiø–V–i`.
 
-Color buttons — 7, 9, 11, and 13 — color most of the loop. On 1645, 7 is Cmaj7–Am7–Fmaj7–G7. I and IV take major 7ths or 9ths, ii and vi take minor 7ths or 9ths, and V takes a dominant 7, 9, or 13. 11 skips the major tonic and leaves out the 3rd. 13 keeps a 7th, so it is not a 6th chord. Sus lands on ii, IV, and V. Dim adds passing or leading-tone dim7s where the roots move by a step, and into the tonic. The richest button wins on each chord. The custom field is one text box; saved presets stay on this device.
+Color buttons add a color only where it is idiomatic. On 1645, 7 is C–Am7–F–G7. 9 colors vi and V (C–Am9–F–G9). 11 and 13 color V (G11, G13). Sus is one resolving pair, Gsus4 then G. Dim adds one passing dim7, F♯dim7 between F and G. The custom field is one text box; saved presets stay on this device. Play and Pause sit above the Practice, Listen, and Quiz tabs.
 
 1645 is `I–vi–IV–V`. It is not 1564.
 

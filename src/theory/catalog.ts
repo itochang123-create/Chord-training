@@ -4,7 +4,7 @@ export const EDITORIAL_NOTE =
   'Order is an editorial starting point for Mandopop familiarity, not a measured frequency chart.'
 
 export const COLOR_NOTE =
-  'Diminished chords are often passing or leading-tone colors. A suspended chord usually resolves. The color examples in this menu are illustrations, not frequency claims. The 7, 9, 11, 13, sus, and dim buttons recolor the loop you are playing.'
+  'Diminished chords are often passing or leading-tone colors. A suspended chord usually resolves. The color examples in this menu are illustrations, not frequency claims.'
 
 export type Preset = {
   id: string

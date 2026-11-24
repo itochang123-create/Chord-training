@@ -1,5 +1,5 @@
 import { realize, type QualityId, type ResolvedChord } from './chord.ts'
-import { locateDegree, spellInterval, type Degree, type Key, type Spelled } from './pitch.ts'
+import { locateDegree, spellInterval, type Degree, type Key } from './pitch.ts'
 
 export type ColorId = 'seven' | 'nine' | 'eleven' | 'thirteen' | 'sus' | 'dim'
 
@@ -24,7 +24,7 @@ export const EMPTY_COLORS: ColorFlags = {
 }
 
 export const COLOR_RULE =
-  '7, 9, 11, and 13 color most of the loop. I and IV take major 7ths or 9ths, ii and vi take minor 7ths or 9ths, and V takes a dominant 7, 9, or 13. 11 skips the major tonic and leaves out the 3rd. 13 keeps a 7th, so it is not a 6th chord. Sus lands on ii, IV, and V so it can resolve. Dim adds a passing or leading-tone dim7 wherever the roots move by a step, and again into the tonic. The richest button wins on each chord.'
+  '7 and 9 color V, and also ii or vi when that chord is already minor. I and IV stay triads. 11 colors V, and ii when the loop has one. 13 colors V and keeps a flat 7th, so it is not a 6th chord. Sus is one dominant that resolves, such as Gsus4 then G. Dim adds one passing dim7 where the roots move by a step, or one leading-tone dim7 into the tonic.'
 
 type Level = '13' | '11' | '9' | '7'
 
@@ -32,22 +32,111 @@ const MINORISH = new Set<QualityId>(['min', 'min6', 'min7', 'min9', 'min11', 'mi
 
 export function applyColors(chords: ResolvedChord[], key: Key, flags: ColorFlags): ResolvedChord[] {
   if (!chords.length || !COLOR_BUTTONS.some((button) => flags[button.id])) return chords
-  const withDims = flags.dim ? insertDims(chords, key) : chords
-  return withDims.map((chord) => recolor(chord, key, flags))
+  const withDim = flags.dim ? insertOneDim(chords, key) : chords
+  const extended = extendIdiomatic(withDim, key, flags)
+  return flags.sus ? resolveOneSus(extended, key, flags) : extended
 }
 
-function recolor(chord: ResolvedChord, key: Key, flags: ColorFlags): ResolvedChord {
-  if (chord.quality === 'dim' || chord.quality === 'dim7' || chord.quality === 'aug') return chord
+function extendIdiomatic(chords: ResolvedChord[], key: Key, flags: ColorFlags): ResolvedChord[] {
+  const levels = selectedLevels(flags)
+  if (!levels.length) return chords
+  let changed = false
+  const next = chords.map((chord) => {
+    if (locked(chord)) return chord
+    const quality = idiomaticQuality(chord, key, levels)
+    if (!quality) return chord
+    changed = true
+    return realize(chord.root, quality, chord.bass, key)
+  })
+  if (changed) return next
+  const index = fallbackIndex(chords, key)
+  const quality = dominantQuality(chords[index], levels[0])
+  if (!quality) return next
+  next[index] = realize(chords[index].root, quality, chords[index].bass, key)
+  return next
+}
+
+function idiomaticQuality(chord: ResolvedChord, key: Key, levels: Level[]): QualityId | null {
   const degree = degreeOf(chord, key)
-  if (flags.sus && degree != null && (degree === 2 || degree === 4 || degree === 5)) {
-    const seventh = flags.seven || flags.nine || flags.eleven || flags.thirteen
-    return realize(chord.root, seventh ? 'dom7sus4' : 'sus4', chord.bass, key)
+  const minor = MINORISH.has(chord.quality)
+  for (const level of levels) {
+    if (level === '13' && degree === 5 && !minor) return 'dom13'
+    if (level === '11' && ((degree === 5 && !minor) || (degree === 2 && minor))) return degree === 2 ? 'min11' : 'dom11'
+    if (level === '9' && ((degree === 5 && !minor) || (minor && (degree === 2 || degree === 6)))) {
+      return degree === 5 ? 'dom9' : 'min9'
+    }
+    if (level === '7' && ((degree === 5) || (minor && (degree === 2 || degree === 6)))) {
+      if (degree === 5 && minor) return 'min7'
+      if (degree === 5) return 'dom7'
+      return 'min7'
+    }
   }
-  for (const level of selectedLevels(flags)) {
-    const quality = extensionQuality(chord, degree, level)
-    if (quality) return realize(chord.root, quality, chord.bass, key)
+  return null
+}
+
+function dominantQuality(chord: ResolvedChord, level: Level): QualityId | null {
+  const minor = MINORISH.has(chord.quality)
+  if (level === '13') return minor ? 'min13' : 'dom13'
+  if (level === '11') return minor ? 'min11' : 'dom11'
+  if (level === '9') return minor ? 'min9' : 'dom9'
+  return minor ? 'min7' : 'dom7'
+}
+
+function resolveOneSus(chords: ResolvedChord[], key: Key, flags: ColorFlags): ResolvedChord[] {
+  const target = susIndex(chords, key)
+  if (target < 0) return chords
+  const current = chords[target]
+  if (locked(current)) return chords
+  const seventh = flags.seven || flags.nine || flags.eleven || flags.thirteen
+  const sus = realize(current.root, seventh ? 'dom7sus4' : 'sus4', current.bass, key)
+  const out = chords.slice()
+  out[target] = sus
+  const next = chords[target + 1]
+  if (next && next.root.pc === current.root.pc && next.quality !== 'sus4' && next.quality !== 'dom7sus4') return out
+  out.splice(target + 1, 0, current)
+  return out
+}
+
+function insertOneDim(chords: ResolvedChord[], key: Key): ResolvedChord[] {
+  if (chords.length < 2 || chords.some((chord) => chord.quality === 'dim' || chord.quality === 'dim7')) return chords
+  for (let index = 0; index < chords.length; index += 1) {
+    const current = chords[index]
+    const next = chords[(index + 1) % chords.length]
+    const rising = (next.root.pc - current.root.pc + 12) % 12
+    if (rising !== 1 && rising !== 2) continue
+    const passing = spellInterval(current.root, 1, 0)
+    if (passing.pc === next.root.pc || passing.pc === current.root.pc) continue
+    return insertAfter(chords, index, realize(passing, 'dim7', passing, key))
   }
-  return chord
+  for (let index = 0; index < chords.length; index += 1) {
+    const next = chords[(index + 1) % chords.length]
+    if (degreeOf(next, key) !== 1) continue
+    const lead = spellInterval(next.root, 11, 6)
+    if (lead.pc === chords[index].root.pc || lead.pc === next.root.pc) continue
+    return insertAfter(chords, index, realize(lead, 'dim7', lead, key))
+  }
+  return chords
+}
+
+function insertAfter(chords: ResolvedChord[], index: number, chord: ResolvedChord): ResolvedChord[] {
+  const out = chords.slice()
+  out.splice(index + 1, 0, chord)
+  return out
+}
+
+function susIndex(chords: ResolvedChord[], key: Key): number {
+  for (const degree of [5, 4, 2] as Degree[]) {
+    const index = chords.findIndex((chord) => degreeOf(chord, key) === degree && !locked(chord))
+    if (index >= 0) return index
+  }
+  return chords.findIndex((chord) => !locked(chord))
+}
+
+function fallbackIndex(chords: ResolvedChord[], key: Key): number {
+  for (let index = chords.length - 1; index >= 0; index -= 1) {
+    if (!locked(chords[index]) && degreeOf(chords[index], key) !== 1) return index
+  }
+  return Math.max(0, chords.findIndex((chord) => !locked(chord)))
 }
 
 function selectedLevels(flags: ColorFlags): Level[] {
@@ -59,54 +148,8 @@ function selectedLevels(flags: ColorFlags): Level[] {
   return levels
 }
 
-function extensionQuality(chord: ResolvedChord, degree: Degree | null, level: Level): QualityId | null {
-  const minor = MINORISH.has(chord.quality)
-  if (level === '11' && !minor && degree === 1) return null
-  if (level === '13') {
-    if (minor) return 'min13'
-    if (degree === 5 || degree === 7) return 'dom13'
-    if (degree === 1 || degree === 4) return 'maj13'
-    return 'dom13'
-  }
-  if (level === '11') return minor ? 'min11' : 'dom11'
-  if (level === '9') {
-    if (minor) return 'min9'
-    if (degree === 1 || degree === 4) return 'maj9'
-    return 'dom9'
-  }
-  if (chord.quality === 'dim') return 'm7b5'
-  if (minor) return 'min7'
-  if (degree === 1 || degree === 4) return 'maj7'
-  return 'dom7'
-}
-
-function insertDims(chords: ResolvedChord[], key: Key): ResolvedChord[] {
-  if (chords.length < 2) return chords
-  const out: ResolvedChord[] = []
-  const seen = new Set(
-    chords.filter((chord) => chord.quality === 'dim' || chord.quality === 'dim7').map((chord) => chord.root.pc),
-  )
-  for (let index = 0; index < chords.length; index += 1) {
-    const current = chords[index]
-    const next = chords[(index + 1) % chords.length]
-    out.push(current)
-    const rising = (next.root.pc - current.root.pc + 12) % 12
-    const candidates: Spelled[] = []
-    if (rising === 1 || rising === 2) {
-      const passing = spellInterval(current.root, 1, 0)
-      if (passing.pc !== next.root.pc && passing.pc !== current.root.pc) candidates.push(passing)
-    }
-    if (degreeOf(next, key) === 1) {
-      const lead = spellInterval(next.root, 11, 6)
-      if (lead.pc !== current.root.pc && lead.pc !== next.root.pc) candidates.push(lead)
-    }
-    for (const root of candidates) {
-      if (seen.has(root.pc)) continue
-      seen.add(root.pc)
-      out.push(realize(root, 'dim7', root, key))
-    }
-  }
-  return out
+function locked(chord: ResolvedChord): boolean {
+  return chord.quality === 'dim' || chord.quality === 'dim7' || chord.quality === 'aug'
 }
 
 function degreeOf(chord: ResolvedChord, key: Key): Degree | null {

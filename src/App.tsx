@@ -199,7 +199,24 @@ export default function App() {
           <h1>Chord</h1>
           <p className="tagline">Hear a progression until the changes sit in your ear.</p>
         </div>
-        <div className="tabs" role="tablist" aria-label="Workspace">
+      </header>
+      <Transport
+        frame={frame}
+        canPlay={settings.workspace === 'quiz' ? Boolean(quiz) : resolved.ok && voiced.length > 0}
+        loop={settings.loop}
+        onPlay={() => {
+          if (settings.workspace === 'quiz') void playQuiz()
+          else void engine.play()
+        }}
+        onPause={() => engine.pause()}
+        onStop={() => engine.stop()}
+        onRestart={() => {
+          if (settings.workspace === 'quiz') void replayQuiz()
+          else void engine.restart()
+        }}
+        onLoop={() => patch({ loop: !settings.loop })}
+      />
+      <div className="tabs" role="tablist" aria-label="Workspace">
           {(['practice', 'listen', 'quiz'] as const).map((workspace) => (
             <button
               key={workspace}
@@ -218,8 +235,7 @@ export default function App() {
               {workspace === 'practice' ? 'Practice' : workspace === 'listen' ? 'Listen' : 'Quiz'}
             </button>
           ))}
-        </div>
-      </header>
+      </div>
 
       {settings.workspace === 'quiz' ? (
         quiz ? (
@@ -279,16 +295,6 @@ export default function App() {
                 {model.kind === 'hidden' ? 'Keyboard covered until you reveal.' : 'The keyboard shows up when the progression is valid.'}
               </div>
             )}
-            <Transport
-              frame={frame}
-              canPlay={resolved.ok && voiced.length > 0}
-              loop={settings.loop}
-              onPlay={() => void engine.play()}
-              onPause={() => engine.pause()}
-              onStop={() => engine.stop()}
-              onRestart={() => void engine.restart()}
-              onLoop={() => patch({ loop: !settings.loop })}
-            />
           </div>
           <Setup
             settings={settings}
