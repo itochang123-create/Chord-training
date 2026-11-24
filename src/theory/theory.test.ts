@@ -6,6 +6,7 @@ import {
   joinSymbols,
   soundingPcs,
   theoreticalPcs,
+  voicePractice,
   voiceProgression,
   VOICING_OMISSION_SUMMARY,
   type ResolvedChord,
@@ -328,7 +329,7 @@ describe('parser failures stay visible', () => {
 describe('catalog', () => {
   test('1645 is never labeled 1564, and the order is explicitly editorial', () => {
     const sixteen = PRESETS.find((preset) => preset.nickname === '1564')
-    const sixteenFour = PRESETS.find((preset) => preset.nickname === '1645')
+    const sixteenFour = PRESETS.find((preset) => preset.id === '1645')
     const six = PRESETS.find((preset) => preset.nickname === '6415')
     expect(sixteen?.formula).toBe('I–V–vi–IV')
     expect(sixteenFour?.formula).toBe('I–vi–IV–V')
@@ -336,34 +337,36 @@ describe('catalog', () => {
     expect(PRESETS.some((preset) => preset.nickname === '1564' && preset.formula === 'I–vi–IV–V')).toBe(false)
     expect(EDITORIAL_NOTE).toMatch(/editorial starting point/)
     expect(EDITORIAL_NOTE).toMatch(/not a measured frequency/)
-    expect(PRESETS.map((preset) => preset.id).slice(0, 4)).toEqual(['6415', '1564', 'royal', '1645'])
+    expect(PRESETS.map((preset) => preset.id).slice(0, 2)).toEqual(['1645', 'descending-bass'])
+    expect(PRESETS[0]?.nickname).toContain('1 6 4 5')
+    expect(PRESETS[1]?.title).toMatch(/Descending bass/)
+    expect(PRESETS[1]?.nickname).toMatch(/Canon|卡農/)
   })
 
   test('every preset parses to the advertised chords', () => {
     expect(symbols(PRESETS.find((preset) => preset.id === 'canon')!.formula)).toHaveLength(8)
     expect(symbols(PRESETS.find((preset) => preset.id === 'royal')!.formula)).toEqual(['F', 'G', 'Em', 'Am'])
-    expect(symbols(PRESETS.find((preset) => preset.id === 'bass-walk')!.formula, 'G')).toEqual([
-      'Em',
-      'C',
+    expect(symbols(PRESETS.find((preset) => preset.id === '1645')!.formula)).toEqual(['C', 'Am', 'F', 'G'])
+    const descent = chords(PRESETS.find((preset) => preset.id === 'descending-bass')!.formula)
+    expect(descent.map((chord) => chord.symbol)).toEqual(['C', 'G/B', 'Am', 'Em/G', 'F', 'C/E', 'Dm', 'G'])
+    expect(descent.map((chord) => chord.bass.name)).toEqual(['C', 'B', 'A', 'G', 'F', 'E', 'D', 'G'])
+    expect(symbols(PRESETS.find((preset) => preset.id === 'bass-walk')!.formula)).toEqual(['Am', 'F', 'C', 'G/B'])
+    expect(symbols(PRESETS.find((preset) => preset.id === 'minor-pop')!.formula, 'C', 'minor')).toEqual([
+      'Cm',
+      'Ab',
+      'Eb',
+      'Bb',
+    ])
+    expect(symbols(PRESETS.find((preset) => preset.id === 'minor-cadence')!.formula, 'C', 'minor')).toEqual([
+      'Cm',
+      'Fm',
       'G',
-      'D/F#',
+      'Cm',
     ])
-    expect(symbols(PRESETS.find((preset) => preset.id === 'minor-pop')!.formula, 'A', 'minor')).toEqual([
-      'Am',
-      'F',
-      'C',
+    expect(symbols(PRESETS.find((preset) => preset.id === 'minor-251')!.formula, 'C', 'minor')).toEqual([
+      'Dm7b5',
       'G',
-    ])
-    expect(symbols(PRESETS.find((preset) => preset.id === 'minor-cadence')!.formula, 'A', 'minor')).toEqual([
-      'Am',
-      'Dm',
-      'E',
-      'Am',
-    ])
-    expect(symbols(PRESETS.find((preset) => preset.id === 'minor-251')!.formula, 'A', 'minor')).toEqual([
-      'Bm7b5',
-      'E',
-      'Am',
+      'Cm',
     ])
     for (const preset of PRESETS) {
       const parsed = parseInKey(preset.formula, 'C', preset.mode)
@@ -373,6 +376,14 @@ describe('catalog', () => {
 })
 
 describe('voice leading', () => {
+  test('practice always uses smooth voice leading', () => {
+    const voiced = voicePractice(chords('C Am'))
+    expect(voiced[0].rhLabel).toMatch(/Smooth voice leading/)
+    expect(voiced[1].rhLabel).toMatch(/Smooth voice leading/)
+    expect(voiced[0].rhMidis).toEqual([60, 64, 67])
+    expect(voiced[1].rhMidis).toEqual([60, 64, 69])
+  })
+
   test('smooth motion from C to Am keeps the common tones', () => {
     const voiced = voiceProgression(chords('C Am'), 'smooth')
     expect(voiced[0].rhMidis).toEqual([60, 64, 67])

@@ -20,17 +20,19 @@ The dev server listens on port **47321** at [http://127.0.0.1:47321/Chord-traini
 - **Listen** hides the names and the keyboard until you press Reveal. The next chord hides them again.
 - **Quiz** plays a progression in a random key and asks which one it was. Triads, or the color examples as written. The correct choice is not marked until you answer.
 
-The progression menu is ordered as an **editorial starting point for Mandopop familiarity, not a measured frequency chart.** It includes Canon (`I–V–vi–iii–IV–I–IV–V`), 6415 (`vi–IV–I–V`), 1564 (`I–V–vi–IV`), 1645 (`I–vi–IV–V`), the Royal Road (`IV–V–iii–vi`) and a longer form, ii–V–I, and minor loops such as `i–VI–III–VII`, `i–iv–V–i`, and `iiø–V–i`.
+Practice is in C. There is no key changer. 1645 is `I–vi–IV–V`, which is C–Am–F–G.
 
-Color examples are labeled as examples, not frequency claims: `ii9–V13–Imaj9` (Dm9–G13–Cmaj9 in C), `I–#I°7–ii7–V7` (C–C♯dim7–Dm7–G7), and `V7sus4–V7–Imaj7` (G7sus4–G7–Cmaj7). A diminished chord is often passing or leading-tone color. A suspended chord usually resolves. The quality stays on that chord. You can edit one chord in the row, or type the whole line.
+The progression menu is ordered as an **editorial starting point for Mandopop familiarity, not a measured frequency chart.** First is 1645 (`I–vi–IV–V`, also called 1 6 4 5). Second is the descending-bass Canon (`I–V6–vi–iii6–IV–I6–ii–V`), bass C–B–A–G–F–E–D–G. After those: 6415, 1564, the Royal Road and a longer form, the root-position Canon, ii–V–I, and minor loops in C minor such as `i–VI–III–VII`, `i–iv–V–i`, and `iiø–V–i`.
+
+Color buttons — 7, 9, 11, 13, sus, and dim — each add that color once, not on every chord. 7 and 13 sit on V, 9 on ii, 11 on IV, sus on the dominant, and dim inserts one passing dim7. More than one button can be on. The custom field is one text box; saved presets stay on this device.
 
 1645 is `I–vi–IV–V`. It is not 1564.
 
 ### The bass-walk example
 
-`vi–IV–I–V6` in G is **Em–C–G–D/F♯**. `D/F♯` is D major with F♯ in the bass: first inversion, because F♯ is the 3rd. Move the key to C and the same numerals become **Am–F–C–G/B**.
+`vi–IV–I–V6` in C is **Am–F–C–G/B**. `G/B` is G major with B in the bass: first inversion, because B is the 3rd.
 
-The right hand can stay in root position while the bass is inverted. A slash note that is not a chord tone, such as `C/B` or `Am/G`, is labeled a **non-chord slash bass**. `Cmaj7/B` is a third inversion, because B is the 7th.
+The right hand is always smooth voice leading. The bass can still be inverted on its own. A slash note that is not a chord tone, such as `C/B` or `Am/G`, is labeled a **non-chord slash bass**. `Cmaj7/B` is a third inversion, because B is the 7th.
 
 ### Writing progressions
 

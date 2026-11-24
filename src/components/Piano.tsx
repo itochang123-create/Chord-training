@@ -22,8 +22,11 @@ export function Piano({
   const firstWhite = whiteOrdinal(whites[0] ?? LOW)
 
   useEffect(() => {
-    const lit = scroller.current?.querySelector<HTMLElement>('[data-active="true"]')
-    lit?.scrollIntoView({ inline: 'center', block: 'nearest' })
+    const frame = scroller.current
+    const lit = frame?.querySelector<HTMLElement>('[data-active="true"]')
+    if (!frame || !lit) return
+    const left = lit.offsetLeft - frame.clientWidth / 2 + lit.clientWidth / 2
+    frame.scrollTo({ left: Math.max(0, left) })
   }, [scrollKey])
 
   return (

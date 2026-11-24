@@ -19,6 +19,23 @@ export type Preset = {
 
 export const PRESETS: Preset[] = [
   {
+    id: '1645',
+    title: 'I–vi–IV–V',
+    formula: 'I–vi–IV–V',
+    nickname: '1645 · 1 6 4 5',
+    mode: 'major',
+    blurb: '1645 is C–Am–F–G. It is I–vi–IV–V, not 1564.',
+  },
+  {
+    id: 'descending-bass',
+    title: 'Descending bass · C–B–A–G–F–E–D–G',
+    formula: 'I–V6–vi–iii6–IV–I6–ii–V',
+    nickname: 'Canon · 卡農',
+    mode: 'major',
+    blurb:
+      'Descending bass, the Canon line. The bass walks C–B–A–G–F–E–D, then G. The chords are C–G/B–Am–Em/G–F–C/E–Dm–G.',
+  },
+  {
     id: '6415',
     title: 'vi–IV–I–V',
     formula: 'vi–IV–I–V',
@@ -43,20 +60,12 @@ export const PRESETS: Preset[] = [
     blurb: 'The Royal Road. In C it is F–G–Em–Am, a ballad shape shared across Mandopop and J-pop.',
   },
   {
-    id: '1645',
-    title: 'I–vi–IV–V',
-    formula: 'I–vi–IV–V',
-    nickname: '1645',
-    mode: 'major',
-    blurb: 'The 1950s progression. 1645 is I–vi–IV–V. It is not 1564.',
-  },
-  {
     id: 'canon',
     title: 'I–V–vi–iii–IV–I–IV–V',
     formula: 'I–V–vi–iii–IV–I–IV–V',
-    nickname: 'Canon',
+    nickname: 'Canon, roots',
     mode: 'major',
-    blurb: 'Pachelbel’s Canon, and a long sentimental ballad shape. Eight chords.',
+    blurb: 'Pachelbel’s Canon in root position. The bass does not walk down; that line is the descending-bass preset.',
   },
   {
     id: 'royal-long',
@@ -96,8 +105,7 @@ export const PRESETS: Preset[] = [
     formula: 'vi–IV–I–V6',
     nickname: '6415 · V in first inversion',
     mode: 'major',
-    blurb:
-      'In G this is Em–C–G–D/F#. D/F# means D with F# in the bass, first inversion. Move the key to C and it becomes Am–F–C–G/B.',
+    blurb: 'In C this is Am–F–C–G/B. G/B is G with B in the bass: first inversion, because B is the 3rd.',
   },
   {
     id: 'minor-pop',
@@ -105,7 +113,7 @@ export const PRESETS: Preset[] = [
     formula: 'i–VI–III–VII',
     nickname: null,
     mode: 'minor',
-    blurb: 'The minor pop loop. In A minor it is Am–F–C–G. The pitches match 6415 in C, with home on the minor tonic.',
+    blurb: 'The minor pop loop in C minor: Cm–A♭–E♭–B♭. Home is the minor tonic.',
   },
   {
     id: 'minor-descent',
@@ -113,7 +121,7 @@ export const PRESETS: Preset[] = [
     formula: 'i–VII–VI–VII',
     nickname: null,
     mode: 'minor',
-    blurb: 'A minor line that keeps touching the flat VII. In A minor: Am–G–F–G.',
+    blurb: 'A minor line that keeps touching the flat VII. In C minor: Cm–B♭–A♭–B♭.',
   },
   {
     id: 'minor-cadence',
@@ -121,7 +129,7 @@ export const PRESETS: Preset[] = [
     formula: 'i–iv–V–i',
     nickname: null,
     mode: 'minor',
-    blurb: 'Minor i, minor iv, major V. The uppercase V is the raised leading tone. In A minor: Am–Dm–E–Am.',
+    blurb: 'Minor i, minor iv, major V. The uppercase V is the raised leading tone. In C minor: Cm–Fm–G–Cm.',
   },
   {
     id: 'minor-turn',
@@ -129,7 +137,7 @@ export const PRESETS: Preset[] = [
     formula: 'i–VI–iv–V',
     nickname: null,
     mode: 'minor',
-    blurb: 'A minor phrase that still resolves with a major V. In A minor: Am–F–Dm–E.',
+    blurb: 'A minor phrase that still resolves with a major V. In C minor: Cm–A♭–Fm–G.',
   },
   {
     id: 'minor-251',
@@ -137,7 +145,7 @@ export const PRESETS: Preset[] = [
     formula: 'iiø–V–i',
     nickname: 'minor ii–V–i',
     mode: 'minor',
-    blurb: 'Half-diminished ii, major V, minor i. In A minor: Bm7b5–E–Am. The color is only on ii.',
+    blurb: 'Half-diminished ii, major V, minor i. In C minor: Dm7♭5–G–Cm. The color is only on ii.',
   },
   {
     id: 'color-ii-v-i',

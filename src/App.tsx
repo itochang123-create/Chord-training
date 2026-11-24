@@ -7,12 +7,13 @@ import { Setup } from './components/Setup.tsx'
 import { Stage } from './components/Stage.tsx'
 import { Transport } from './components/Transport.tsx'
 import { EDITORIAL_NOTE, presetById, PRESETS } from './theory/catalog.ts'
-import { voiceProgression, VOICING_OMISSION_SUMMARY } from './theory/chord.ts'
+import { voicePractice, VOICING_OMISSION_SUMMARY } from './theory/chord.ts'
+import { applyColors } from './theory/colorize.ts'
 import { makeKey, prettify } from './theory/pitch.ts'
 import { resolveProgression } from './theory/resolve.ts'
 import { grade, makeQuestion, type Grade, type QuizPublic, type QuizSecret } from './practice/quiz.ts'
 import { stageModel } from './practice/stageModel.ts'
-import { saveSettings, type SavedPreset, type Settings, loadSettings } from './practice/storage.ts'
+import { PRACTICE_VOLUME, saveSettings, type SavedPreset, type Settings, loadSettings } from './practice/storage.ts'
 
 type QuizView = {
   key: string
@@ -51,22 +52,13 @@ export default function App() {
 
   const activePreset = settings.presetId === 'custom' ? null : (presetById(settings.presetId) ?? PRESETS[0])
   const text = activePreset ? activePreset.formula : settings.customText
-  const soundingKey = useMemo(
-    () => makeKey(settings.tonicName, settings.mode),
-    [settings.tonicName, settings.mode],
+  const soundingKey = useMemo(() => makeKey('C', settings.mode), [settings.mode])
+  const resolved = useMemo(() => resolveProgression(text, soundingKey, null), [text, soundingKey])
+  const colored = useMemo(
+    () => (resolved.ok ? applyColors(resolved.chords, soundingKey, settings.colors) : []),
+    [resolved, soundingKey, settings.colors],
   )
-  const anchor = useMemo(() => {
-    if (activePreset || !settings.anchorTonic || !settings.anchorMode) return null
-    return makeKey(settings.anchorTonic, settings.anchorMode)
-  }, [activePreset, settings.anchorTonic, settings.anchorMode])
-  const resolved = useMemo(
-    () => resolveProgression(text, soundingKey, anchor),
-    [text, soundingKey, anchor],
-  )
-  const voiced = useMemo(
-    () => (resolved.ok ? voiceProgression(resolved.chords, settings.rhVoicing) : []),
-    [resolved, settings.rhVoicing],
-  )
+  const voiced = useMemo(() => voicePractice(colored), [colored])
   const practiceConfig = useMemo(() => toPerformance(settings, voiced), [settings, voiced])
 
   useEffect(() => () => engine.dispose(), [engine])
@@ -86,8 +78,8 @@ export default function App() {
       quizSound.current = quiz.secret
       engine.stop()
     }
-    engine.setPerformance(quizPerformance(quiz.secret, settings.volume))
-  }, [engine, quiz, settings.volume, settings.workspace])
+    engine.setPerformance(quizPerformance(quiz.secret))
+  }, [engine, quiz, settings.workspace])
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target
@@ -114,7 +106,7 @@ export default function App() {
     chordCount: voiced.length,
     voiced: voiced[chordIndex] ?? null,
   })
-  const soundingLabel = resolved.ok ? resolved.chords.map((chord) => prettify(chord.symbol)).join(' – ') : null
+  const soundingLabel = colored.length ? colored.map((chord) => prettify(chord.symbol)).join(' – ') : null
   const currentVoicing = voiced[chordIndex]
   const soundingNow =
     frame.active.length === 0 || !currentVoicing
@@ -125,14 +117,6 @@ export default function App() {
           .map((name) => prettify(name))
           .join(' · ') || '—'
   const pianoNotes = model.kind === 'shown' ? frame.active : []
-  const chordSlots = resolved.ok
-    ? resolved.chords.map((chord) => ({
-        symbol: chord.symbol,
-        root: chord.root.name,
-        quality: chord.quality,
-        bass: chord.bass.pc === chord.root.pc ? '' : chord.bass.name,
-      }))
-    : []
 
   function patch(partial: Partial<Settings>) {
     setSettings((current) => ({ ...current, ...partial }))
@@ -143,16 +127,8 @@ export default function App() {
       ...current,
       customText: value,
       presetId: 'custom',
-      anchorTonic: current.tonicName,
-      anchorMode: current.mode,
+      mode: 'major',
     }))
-  }
-
-  function editChord(index: number, symbol: string) {
-    if (!resolved.ok) return
-    const next = resolved.chords.map((chord) => chord.symbol)
-    next[index] = symbol
-    onCustom(next.join(' '))
   }
 
   function savePreset() {
@@ -162,11 +138,9 @@ export default function App() {
       id: `user-${Date.now()}`,
       name,
       text,
-      tonicName: settings.tonicName,
       mode: settings.mode,
       tempo: settings.tempo,
       accompaniment: settings.accompaniment,
-      rhVoicing: settings.rhVoicing,
     }
     setSettings((current) => ({ ...current, presets: [saved, ...current.presets].slice(0, 40) }))
     setPresetName('')
@@ -177,13 +151,9 @@ export default function App() {
       ...current,
       presetId: 'custom',
       customText: preset.text,
-      tonicName: preset.tonicName,
       mode: preset.mode,
-      anchorTonic: preset.tonicName,
-      anchorMode: preset.mode,
       tempo: preset.tempo,
       accompaniment: preset.accompaniment,
-      rhVoicing: preset.rhVoicing,
     }))
   }
 
@@ -211,13 +181,13 @@ export default function App() {
 
   async function playQuiz() {
     if (!quiz) return
-    engine.setPerformance(quizPerformance(quiz.secret, settings.volume))
+    engine.setPerformance(quizPerformance(quiz.secret))
     await engine.play()
   }
 
   async function replayQuiz() {
     if (!quiz) return
-    engine.setPerformance(quizPerformance(quiz.secret, settings.volume))
+    engine.setPerformance(quizPerformance(quiz.secret))
     await engine.restart()
   }
 
@@ -282,12 +252,6 @@ export default function App() {
                 ))}
               </ol>
             ) : null}
-            {namesVisible && resolved.ok && resolved.grammar === 'concrete' && resolved.delta !== 0 && anchor ? (
-              <p className="help written-key">
-                Written in {prettify(anchor.tonic.name)} {anchor.mode}. Sounding in {prettify(soundingKey.tonic.name)}{' '}
-                {soundingKey.mode}.
-              </p>
-            ) : null}
             <Stage
               model={model}
               soundingNow={model.kind === 'shown' ? soundingNow : '—'}
@@ -303,7 +267,7 @@ export default function App() {
             {model.kind === 'shown' ? (
               <Piano
                 notes={pianoNotes}
-                scrollKey={`${chordIndex}:${settings.rhVoicing}:${soundingLabel ?? ''}`}
+                scrollKey={`${chordIndex}:${soundingLabel ?? ''}`}
                 caption={
                   frame.status === 'playing'
                     ? 'Amber keys are the bass. Teal keys are the right hand. Lit keys are the notes sounding right now.'
@@ -333,12 +297,10 @@ export default function App() {
             sounding={namesVisible ? soundingLabel : null}
             error={resolved.ok ? null : resolved.error}
             chordCount={voiced.length}
-            chordSlots={namesVisible ? chordSlots : []}
             presetName={presetName}
             onPresetName={setPresetName}
             onPatch={patch}
             onCustom={onCustom}
-            onEditChord={editChord}
             onShowProgression={() =>
               setCover({
                 workspace: settings.workspace,
@@ -369,24 +331,24 @@ function sittingOf(key: string): string {
   return `${session}:${difficulty}`
 }
 
-function toPerformance(settings: Settings, voiced: ReturnType<typeof voiceProgression>): PerformanceConfig {
+function toPerformance(settings: Settings, voiced: ReturnType<typeof voicePractice>): PerformanceConfig {
   const partial = {
     bpm: settings.tempo,
     accompaniment: settings.accompaniment,
     loop: settings.loop,
-    volume: settings.volume,
+    volume: PRACTICE_VOLUME,
     voiced,
   }
   return { ...partial, signature: performanceSignature(partial) }
 }
 
-function quizPerformance(secret: QuizSecret, volume: number): PerformanceConfig {
+function quizPerformance(secret: QuizSecret): PerformanceConfig {
   const partial = {
     bpm: 84,
     accompaniment: 'audition' as const,
     loop: true,
-    volume,
-    voiced: voiceProgression(secret.chords, 'root'),
+    volume: PRACTICE_VOLUME,
+    voiced: voicePractice(secret.chords),
   }
   return { ...partial, signature: performanceSignature(partial) }
 }

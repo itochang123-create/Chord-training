@@ -4,7 +4,7 @@ import { makeKey } from '../theory/pitch.ts'
 import { parseInKey } from '../theory/parse.ts'
 import { grade, makeQuestion } from './quiz.ts'
 import { stageModel } from './stageModel.ts'
-import { loadSettings, saveSettings, type KeyValueStore } from './storage.ts'
+import { loadSettings, PRACTICE_TONIC, PRACTICE_VOLUME, saveSettings, type KeyValueStore } from './storage.ts'
 
 function rngFrom(seed: number): () => number {
   let state = seed >>> 0
@@ -98,10 +98,16 @@ describe('settings stay on the device', () => {
       getItem: (key) => memory.get(key) ?? null,
       setItem: (key, value) => memory.set(key, value),
     }
-    expect(loadSettings(store).presetId).toBe('6415')
-    saveSettings({ ...loadSettings(store), tempo: 92, presetId: '1645', tonicName: 'Eb' }, store)
-    expect(loadSettings(store)).toMatchObject({ tempo: 92, presetId: '1645', tonicName: 'Eb' })
+    expect(loadSettings(store).presetId).toBe('1645')
+    expect(loadSettings(store).mode).toBe('major')
+    expect(PRACTICE_TONIC).toBe('C')
+    expect(PRACTICE_VOLUME).toBe(0.8)
+    expect(loadSettings(store)).not.toHaveProperty('volume')
+    expect(loadSettings(store)).not.toHaveProperty('rhVoicing')
+    expect(loadSettings(store)).not.toHaveProperty('tonicName')
+    saveSettings({ ...loadSettings(store), tempo: 92, presetId: '6415', mode: 'minor' }, store)
+    expect(loadSettings(store)).toMatchObject({ tempo: 92, presetId: '6415', mode: 'minor' })
     store.setItem('chord.ito.v1', '{')
-    expect(loadSettings(store).tonicName).toBe('C')
+    expect(loadSettings(store).presetId).toBe('1645')
   })
 })

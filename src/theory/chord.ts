@@ -644,6 +644,10 @@ export function voiceChord(
   }
 }
 
+export function voicePractice(chords: ResolvedChord[]): VoicedChord[] {
+  return voiceProgression(chords, 'smooth')
+}
+
 export function voiceProgression(chords: ResolvedChord[], mode: RhVoicing): VoicedChord[] {
   const voiceAll = (previousRh: number[] | null, previousBass: number | null) => {
     const voiced: VoicedChord[] = []

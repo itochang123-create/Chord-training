@@ -1,7 +1,10 @@
 import { isAccompanimentId, type AccompanimentId } from '../audio/plan.ts'
-import type { RhVoicing } from '../theory/chord.ts'
-import { isTonicName, TONIC_NAMES, type Mode, type TonicName } from '../theory/pitch.ts'
+import { EMPTY_COLORS, type ColorFlags, type ColorId } from '../theory/colorize.ts'
+import type { Mode } from '../theory/pitch.ts'
 import type { Difficulty } from './quiz.ts'
+
+export const PRACTICE_TONIC = 'C' as const
+export const PRACTICE_VOLUME = 0.8
 
 export type Workspace = 'practice' | 'listen' | 'quiz'
 
@@ -9,24 +12,18 @@ export type SavedPreset = {
   id: string
   name: string
   text: string
-  tonicName: TonicName
   mode: Mode
   tempo: number
   accompaniment: AccompanimentId
-  rhVoicing: RhVoicing
 }
 
 export type Settings = {
-  tonicName: TonicName
   mode: Mode
   presetId: string
   customText: string
-  anchorTonic: TonicName | null
-  anchorMode: Mode | null
   tempo: number
   accompaniment: AccompanimentId
-  volume: number
-  rhVoicing: RhVoicing
+  colors: ColorFlags
   loop: boolean
   workspace: Workspace
   quizDifficulty: Difficulty
@@ -34,16 +31,12 @@ export type Settings = {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  tonicName: 'C',
   mode: 'major',
-  presetId: '6415',
+  presetId: '1645',
   customText: '',
-  anchorTonic: null,
-  anchorMode: null,
   tempo: 76,
   accompaniment: 'bass-chord',
-  volume: 0.8,
-  rhVoicing: 'smooth',
+  colors: { ...EMPTY_COLORS },
   loop: true,
   workspace: 'practice',
   quizDifficulty: 'triad',
@@ -87,21 +80,15 @@ function browserStore(): KeyValueStore | null {
 }
 
 function sanitize(value: Partial<Settings>): Settings {
-  const hands: RhVoicing[] = ['root', 'first', 'second', 'smooth']
-  const tonicName = typeof value.tonicName === 'string' && isTonicName(value.tonicName) ? value.tonicName : 'C'
   const rawDifficulty = value.quizDifficulty as string | undefined
   const difficulty = rawDifficulty === 'color' || rawDifficulty === 'rich' ? 'color' : 'triad'
   return {
-    tonicName,
     mode: value.mode === 'minor' ? 'minor' : 'major',
-    presetId: typeof value.presetId === 'string' && value.presetId ? value.presetId : '6415',
+    presetId: typeof value.presetId === 'string' && value.presetId ? value.presetId : '1645',
     customText: typeof value.customText === 'string' ? value.customText.slice(0, 500) : '',
-    anchorTonic: typeof value.anchorTonic === 'string' && isTonicName(value.anchorTonic) ? value.anchorTonic : null,
-    anchorMode: value.anchorMode === 'major' || value.anchorMode === 'minor' ? value.anchorMode : null,
     tempo: clamp(value.tempo, 40, 200, 76),
     accompaniment: typeof value.accompaniment === 'string' && isAccompanimentId(value.accompaniment) ? value.accompaniment : 'bass-chord',
-    volume: clamp(value.volume, 0, 1, 0.8),
-    rhVoicing: hands.includes(value.rhVoicing as RhVoicing) ? (value.rhVoicing as RhVoicing) : 'smooth',
+    colors: sanitizeColors(value.colors),
     loop: value.loop !== false,
     workspace: value.workspace === 'listen' || value.workspace === 'quiz' ? value.workspace : 'practice',
     quizDifficulty: difficulty,
@@ -109,17 +96,21 @@ function sanitize(value: Partial<Settings>): Settings {
   }
 }
 
+function sanitizeColors(value: Partial<ColorFlags> | undefined): ColorFlags {
+  const source = value ?? {}
+  const colors = { ...EMPTY_COLORS }
+  for (const id of Object.keys(colors) as ColorId[]) colors[id] = source[id] === true
+  return colors
+}
+
 function sanitizePreset(value: Partial<SavedPreset>): SavedPreset {
-  const hands: RhVoicing[] = ['root', 'first', 'second', 'smooth']
   return {
-    id: typeof value.id === 'string' ? value.id : `saved-${TONIC_NAMES.length}`,
+    id: typeof value.id === 'string' ? value.id : 'saved',
     name: typeof value.name === 'string' ? value.name.slice(0, 48) : '',
     text: typeof value.text === 'string' ? value.text.slice(0, 500) : '',
-    tonicName: typeof value.tonicName === 'string' && isTonicName(value.tonicName) ? value.tonicName : 'C',
     mode: value.mode === 'minor' ? 'minor' : 'major',
     tempo: clamp(value.tempo, 40, 200, 76),
     accompaniment: typeof value.accompaniment === 'string' && isAccompanimentId(value.accompaniment) ? value.accompaniment : 'bass-chord',
-    rhVoicing: hands.includes(value.rhVoicing as RhVoicing) ? (value.rhVoicing as RhVoicing) : 'smooth',
   }
 }
 
