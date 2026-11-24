@@ -1,16 +1,51 @@
 import type { VoicedChord } from '../theory/chord.ts'
 import { secondsPerBeat } from './meter.ts'
 
-export type AccompanimentId = 'audition' | 'block' | 'bass-chord' | 'arpeggio' | 'alberti' | 'waltz' | 'ballad'
+export type AccompanimentId =
+  | 'audition'
+  | 'block'
+  | 'bass-chord'
+  | 'arpeggio'
+  | 'alberti'
+  | 'waltz'
+  | 'ballad'
+  | 'stride'
+  | 'walking'
+  | 'pedal'
+  | 'broken-octaves'
+  | 'rolled'
+  | 'pop-eighths'
+  | 'rock'
+  | 'hymn'
+  | 'jazz'
+  | 'gospel'
+  | 'bossa'
+  | 'march'
+  | 'tremolo'
+  | 'tresillo'
 
 export const ACCOMPANIMENT_IDS: AccompanimentId[] = [
   'audition',
   'block',
   'bass-chord',
+  'stride',
+  'walking',
+  'pedal',
   'arpeggio',
   'alberti',
-  'waltz',
+  'broken-octaves',
+  'rolled',
   'ballad',
+  'pop-eighths',
+  'rock',
+  'waltz',
+  'hymn',
+  'jazz',
+  'gospel',
+  'bossa',
+  'march',
+  'tremolo',
+  'tresillo',
 ]
 
 export const ACCOMPANIMENTS: Record<AccompanimentId, { label: string; feel: string; beatsPerChord: number }> = {
@@ -49,6 +84,76 @@ export const ACCOMPANIMENTS: Record<AccompanimentId, { label: string; feel: stri
     feel: 'The bass holds while the right hand rolls through the chord.',
     beatsPerChord: 4,
   },
+  stride: {
+    label: 'Stride',
+    feel: 'Low bass on 1, the chord on 2, a higher bass note on 3, the chord again on 4.',
+    beatsPerChord: 4,
+  },
+  walking: {
+    label: 'Walking bass',
+    feel: 'The bass walks root, chord tone, fifth, and a step toward the next chord. No right-hand stabs.',
+    beatsPerChord: 4,
+  },
+  pedal: {
+    label: 'Pedal bass',
+    feel: 'One bass note holds the whole bar. The chord taps on 2 and 4.',
+    beatsPerChord: 4,
+  },
+  'broken-octaves': {
+    label: 'Broken octaves',
+    feel: 'The bass note and the octave above, back and forth.',
+    beatsPerChord: 4,
+  },
+  rolled: {
+    label: 'Rolled arpeggio',
+    feel: 'A slow upward roll that keeps ringing. Each new note overlaps the ones already sounding.',
+    beatsPerChord: 4,
+  },
+  'pop-eighths': {
+    label: 'Pop eighth notes',
+    feel: 'The chord on every eighth note, with the bass on 1 and 3.',
+    beatsPerChord: 4,
+  },
+  rock: {
+    label: 'Rock octaves',
+    feel: 'Bass octaves on the strong beats, the chord on the offbeats.',
+    beatsPerChord: 4,
+  },
+  hymn: {
+    label: 'Hymn',
+    feel: 'Long chord tones on 1 and 3, with a breath before the next chord.',
+    beatsPerChord: 4,
+  },
+  jazz: {
+    label: 'Jazz comp',
+    feel: 'Bass on 1. The right hand jabs on the and of 2 and on 4.',
+    beatsPerChord: 4,
+  },
+  gospel: {
+    label: 'Gospel chops',
+    feel: 'Bass on 1, then the chord pushes every offbeat.',
+    beatsPerChord: 4,
+  },
+  bossa: {
+    label: 'Bossa nova',
+    feel: 'Bass on 1, a quiet chord just after 2, and the fifth of the bass on 4.',
+    beatsPerChord: 4,
+  },
+  march: {
+    label: 'March',
+    feel: 'A clipped bass, chord, bass, chord. The notes are short.',
+    beatsPerChord: 4,
+  },
+  tremolo: {
+    label: 'Tremolo',
+    feel: 'The bass holds. Two right-hand notes tremble back and forth.',
+    beatsPerChord: 4,
+  },
+  tresillo: {
+    label: '3+3+2 ballad',
+    feel: 'Long, long, short: the chord lands on 1, the and of 2, and 4.',
+    beatsPerChord: 4,
+  },
 }
 
 export function beatsPerChord(id: AccompanimentId): number {
@@ -83,6 +188,8 @@ type Hit = {
   dur: number
   part: 'bass' | 'rh-all' | 'rh-one'
   arpIndex?: number
+  /** Extra bass shape: octave doubles the note, fifth replaces it, walk picks a step. */
+  bass?: 'root' | 'octave' | 'upper' | 'fifth' | 'walk'
 }
 
 export function planWindow(input: PlanInput): PlannedNote[] {
@@ -102,7 +209,7 @@ export function planWindow(input: PlanInput): PlannedNote[] {
     const chordIndex = ((instance % voiced.length) + voiced.length) % voiced.length
     const chordStart = instance * beats
     const chord = voiced[chordIndex]
-    const hits = accompanimentHits(input.accompaniment, chord.rhMidis.length)
+    const hits = accompanimentHits(input.accompaniment, chord)
     hits.forEach((hit, hitIndex) => {
       const startBeat = chordStart + hit.beat
       const endBeat = Math.min(chordStart + beats, startBeat + hit.dur)
@@ -179,8 +286,9 @@ export function chordSeconds(bpm: number, id: AccompanimentId): number {
   return beatsPerChord(id) * secondsPerBeat(bpm)
 }
 
-function accompanimentHits(id: AccompanimentId, rhCount: number): Hit[] {
+function accompanimentHits(id: AccompanimentId, chord: VoicedChord): Hit[] {
   const beats = beatsPerChord(id)
+  const rhCount = chord.rhMidis.length
   if (id === 'audition') {
     return [
       { beat: 0, dur: beats, part: 'bass' },
@@ -209,10 +317,116 @@ function accompanimentHits(id: AccompanimentId, rhCount: number): Hit[] {
       { beat: 2, dur: 0.85, part: 'rh-all' },
     ]
   }
+  if (id === 'ballad') {
+    return [
+      { beat: 0, dur: 1.85, part: 'bass' },
+      { beat: 2, dur: 1.85, part: 'bass' },
+      ...gridHits(0.5, beats, rollCycle(rhCount), 0.4, false),
+    ]
+  }
+  if (id === 'stride') {
+    return [
+      { beat: 0, dur: 0.9, part: 'bass' },
+      { beat: 1, dur: 0.85, part: 'rh-all' },
+      { beat: 2, dur: 0.9, part: 'bass', bass: 'fifth' },
+      { beat: 3, dur: 0.85, part: 'rh-all' },
+    ]
+  }
+  if (id === 'walking') {
+    return [0, 1, 2, 3].map((beat) => ({ beat, dur: 0.92, part: 'bass' as const, bass: 'walk' as const, arpIndex: beat }))
+  }
+  if (id === 'pedal') {
+    return [
+      { beat: 0, dur: beats, part: 'bass' },
+      { beat: 1, dur: 0.75, part: 'rh-all' },
+      { beat: 3, dur: 0.75, part: 'rh-all' },
+    ]
+  }
+  if (id === 'broken-octaves') {
+    return [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5].map((beat, index) => ({
+      beat,
+      dur: 0.42,
+      part: 'bass' as const,
+      bass: index % 2 === 0 ? 'root' : 'upper',
+    }))
+  }
+  if (id === 'rolled') {
+    const hits: Hit[] = [{ beat: 0, dur: beats, part: 'bass' }]
+    const count = Math.max(rhCount, 1)
+    for (let index = 0; index < count; index += 1) {
+      const beat = 0.4 * (index + 1)
+      hits.push({ beat, dur: beats - beat, part: 'rh-one', arpIndex: index })
+    }
+    return hits
+  }
+  if (id === 'pop-eighths') {
+    const hits: Hit[] = [
+      { beat: 0, dur: 0.35, part: 'bass' },
+      { beat: 2, dur: 0.35, part: 'bass' },
+    ]
+    for (let beat = 0; beat < beats; beat += 0.5) hits.push({ beat, dur: 0.28, part: 'rh-all' })
+    return hits
+  }
+  if (id === 'rock') {
+    return [
+      { beat: 0, dur: 0.4, part: 'bass', bass: 'octave' },
+      { beat: 0.5, dur: 0.4, part: 'rh-all' },
+      { beat: 1.5, dur: 0.4, part: 'rh-all' },
+      { beat: 2, dur: 0.4, part: 'bass', bass: 'octave' },
+      { beat: 2.5, dur: 0.4, part: 'rh-all' },
+      { beat: 3.5, dur: 0.4, part: 'rh-all' },
+    ]
+  }
+  if (id === 'hymn') {
+    return [0, 2].flatMap((beat) => [
+      { beat, dur: 1.55, part: 'bass' as const },
+      { beat, dur: 1.55, part: 'rh-all' as const },
+    ])
+  }
+  if (id === 'jazz') {
+    return [
+      { beat: 0, dur: 0.55, part: 'bass' },
+      { beat: 1.5, dur: 0.4, part: 'rh-all' },
+      { beat: 3, dur: 0.7, part: 'rh-all' },
+    ]
+  }
+  if (id === 'gospel') {
+    return [
+      { beat: 0, dur: 0.9, part: 'bass' },
+      { beat: 0.5, dur: 0.4, part: 'rh-all' },
+      { beat: 1.5, dur: 0.4, part: 'rh-all' },
+      { beat: 2.5, dur: 0.4, part: 'rh-all' },
+      { beat: 3.5, dur: 0.35, part: 'rh-all' },
+    ]
+  }
+  if (id === 'bossa') {
+    return [
+      { beat: 0, dur: 0.4, part: 'bass' },
+      { beat: 1.5, dur: 0.4, part: 'rh-all' },
+      { beat: 3, dur: 0.45, part: 'bass', bass: 'fifth' },
+    ]
+  }
+  if (id === 'march') {
+    return [
+      { beat: 0, dur: 0.28, part: 'bass' },
+      { beat: 1, dur: 0.28, part: 'rh-all' },
+      { beat: 2, dur: 0.28, part: 'bass' },
+      { beat: 3, dur: 0.28, part: 'rh-all' },
+    ]
+  }
+  if (id === 'tremolo') {
+    const top = Math.min(1, Math.max(rhCount - 1, 0))
+    const hits: Hit[] = [{ beat: 0, dur: beats, part: 'bass' }]
+    for (let index = 0; index < 8; index += 1) {
+      hits.push({ beat: index * 0.5, dur: 0.42, part: 'rh-one', arpIndex: index % 2 === 0 ? 0 : top })
+    }
+    return hits
+  }
   return [
-    { beat: 0, dur: 1.85, part: 'bass' },
-    { beat: 2, dur: 1.85, part: 'bass' },
-    ...gridHits(0.5, beats, rollCycle(rhCount), 0.4, false),
+    { beat: 0, dur: 1.15, part: 'bass' },
+    { beat: 0, dur: 1.15, part: 'rh-all' },
+    { beat: 1.5, dur: 1.15, part: 'rh-all' },
+    { beat: 3, dur: 0.85, part: 'rh-all' },
   ]
 }
 
@@ -259,8 +473,33 @@ function rollCycle(rhCount: number): number[] {
 }
 
 function midisFor(hit: Hit, chord: VoicedChord): number[] {
-  if (hit.part === 'bass') return [chord.bassMidi]
+  if (hit.part === 'bass') return bassMidis(hit, chord)
   if (hit.part === 'rh-all') return [...chord.rhMidis]
   if (chord.rhMidis.length === 0) return []
   return [chord.rhMidis[(hit.arpIndex ?? 0) % chord.rhMidis.length]]
+}
+
+function bassMidis(hit: Hit, chord: VoicedChord): number[] {
+  const root = chord.bassMidi
+  if (hit.bass === 'octave') return [root, Math.min(root + 12, 76)]
+  if (hit.bass === 'upper') return [Math.min(root + 12, 76)]
+  if (hit.bass === 'fifth') return [Math.min(root + 7, 70)]
+  if (hit.bass === 'walk') return [walkMidi(chord, hit.arpIndex ?? 0)]
+  return [root]
+}
+
+function walkMidi(chord: VoicedChord, step: number): number {
+  const root = chord.bassMidi
+  if (step === 0) return root
+  if (step === 2) return Math.min(root + 7, 70)
+  if (step === 3) return Math.min(root + 10, 72)
+  const third = chord.rhMidis.find((midi) => mod12(midi) !== mod12(root))
+  const thirdPc = third == null ? mod12(root + 4) : mod12(third)
+  let midi = root + ((thirdPc - mod12(root) + 12) % 12)
+  if (midi <= root) midi += 12
+  return Math.min(midi, 72)
+}
+
+function mod12(midi: number): number {
+  return ((midi % 12) + 12) % 12
 }

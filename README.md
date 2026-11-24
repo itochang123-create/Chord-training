@@ -24,7 +24,7 @@ Practice is in C. There is no key changer. 1645 is `I–vi–IV–V`, which is C
 
 The progression menu is ordered as an **editorial starting point for Mandopop familiarity, not a measured frequency chart.** First is 1645 (`I–vi–IV–V`, also called 1 6 4 5). Second is the descending-bass Canon (`I–V6–vi–iii6–IV–I6–ii–V`), bass C–B–A–G–F–E–D–G. After those: 6415, 1564, the Royal Road and a longer form, the root-position Canon, ii–V–I, and minor loops in C minor such as `i–VI–III–VII`, `i–iv–V–i`, and `iiø–V–i`.
 
-Color buttons — 7, 9, 11, 13, sus, and dim — each add that color once, not on every chord. 7 and 13 sit on V, 9 on ii, 11 on IV, sus on the dominant, and dim inserts one passing dim7. More than one button can be on. The custom field is one text box; saved presets stay on this device.
+Color buttons — 7, 9, 11, and 13 — color most of the loop. On 1645, 7 is Cmaj7–Am7–Fmaj7–G7. I and IV take major 7ths or 9ths, ii and vi take minor 7ths or 9ths, and V takes a dominant 7, 9, or 13. 11 skips the major tonic and leaves out the 3rd. 13 keeps a 7th, so it is not a 6th chord. Sus lands on ii, IV, and V. Dim adds passing or leading-tone dim7s where the roots move by a step, and into the tonic. The richest button wins on each chord. The custom field is one text box; saved presets stay on this device.
 
 1645 is `I–vi–IV–V`. It is not 1564.
 
@@ -61,10 +61,24 @@ Tempo is the quarter note. The accompaniment chooses its own shape. There is no 
 - **Plain chord** — one attack, then the chord holds.
 - **Block chords** — the whole chord together, twice in the bar.
 - **Bass and chord** — bass on 1 and 3, chord on 2 and 4.
-- **Broken chord** — one note at a time. Each note ends before the next.
+- **Stride** — low bass on 1, the chord on 2, a higher bass note on 3, the chord again on 4.
+- **Walking bass** — root, chord tone, fifth, then a step toward the next chord.
+- **Pedal bass** — one bass note holds; the chord taps on 2 and 4.
+- **Broken chord** — one note at a time, up and back. Each note ends before the next.
 - **Alberti bass** — low, high, middle, high, with the bass on the beat.
+- **Broken octaves** — the bass note and the octave above, back and forth.
+- **Rolled arpeggio** — a slow upward roll; each new note keeps ringing.
+- **Ballad roll** — the bass holds while the right hand rolls one note at a time.
+- **Pop eighth notes** — the chord on every eighth note, bass on 1 and 3.
+- **Rock octaves** — bass octaves on the strong beats, the chord on the offbeats.
 - **Waltz** — bass, then chord, then chord.
-- **Ballad roll** — the bass holds while the right hand rolls.
+- **Hymn** — long chord tones on 1 and 3, with a breath before the next chord.
+- **Jazz comp** — bass on 1, right-hand jabs on the and of 2 and on 4.
+- **Gospel chops** — bass on 1, then the chord on every offbeat.
+- **Bossa nova** — bass on 1, a quiet chord just after 2, the fifth of the bass on 4.
+- **March** — clipped bass, chord, bass, chord.
+- **Tremolo** — the bass holds while two right-hand notes tremble.
+- **3+3+2 ballad** — the chord lands on 1, the and of 2, and 4.
 
 The keyboard lights only notes that are sounding, bass in amber and right hand in teal. The voicing line is the written piano layout. “Sounding now” is the notes in the air at that moment.
 

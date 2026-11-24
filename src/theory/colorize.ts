@@ -1,5 +1,5 @@
 import { realize, type QualityId, type ResolvedChord } from './chord.ts'
-import { locateDegree, spellInterval, type Degree, type Key } from './pitch.ts'
+import { locateDegree, spellInterval, type Degree, type Key, type Spelled } from './pitch.ts'
 
 export type ColorId = 'seven' | 'nine' | 'eleven' | 'thirteen' | 'sus' | 'dim'
 
@@ -24,93 +24,89 @@ export const EMPTY_COLORS: ColorFlags = {
 }
 
 export const COLOR_RULE =
-  'Each button adds that color once, not on every chord. 7 sits on V, 9 on ii, 11 on IV, and 13 on V. Sus sits on the dominant so the next chord can resolve it. Dim inserts one passing dim7 after the first chord. Buttons combine when the loop has room; a richer chord keeps the 7th it already contains.'
+  '7, 9, 11, and 13 color most of the loop. I and IV take major 7ths or 9ths, ii and vi take minor 7ths or 9ths, and V takes a dominant 7, 9, or 13. 11 skips the major tonic and leaves out the 3rd. 13 keeps a 7th, so it is not a 6th chord. Sus lands on ii, IV, and V so it can resolve. Dim adds a passing or leading-tone dim7 wherever the roots move by a step, and again into the tonic. The richest button wins on each chord.'
 
-type Job = 'sus' | '13' | '11' | '9' | '7'
+type Level = '13' | '11' | '9' | '7'
 
 const MINORISH = new Set<QualityId>(['min', 'min6', 'min7', 'min9', 'min11', 'min13', 'm7b5'])
 
 export function applyColors(chords: ResolvedChord[], key: Key, flags: ColorFlags): ResolvedChord[] {
-  if (!chords.length || !anyColor(flags)) return chords
-  const next = chords.map((chord) => chord)
-  const locked = new Set<number>()
-  if (flags.dim && !next.some((chord) => chord.quality === 'dim' || chord.quality === 'dim7')) {
-    const passing = passingDim(next[0], key)
-    next.splice(1, 0, passing)
-    locked.add(1)
-  }
+  if (!chords.length || !COLOR_BUTTONS.some((button) => flags[button.id])) return chords
+  const withDims = flags.dim ? insertDims(chords, key) : chords
+  return withDims.map((chord) => recolor(chord, key, flags))
+}
 
-  const jobs = new Map<number, Set<Job>>()
-  const avoid = new Set(locked)
-  const claim = (prefer: Degree[], job: Job) => {
-    const home = pick(next, key, prefer, avoid, true)
-    if (home == null) return
-    addJob(jobs, home, job)
-    avoid.add(home)
+function recolor(chord: ResolvedChord, key: Key, flags: ColorFlags): ResolvedChord {
+  if (chord.quality === 'dim' || chord.quality === 'dim7' || chord.quality === 'aug') return chord
+  const degree = degreeOf(chord, key)
+  if (flags.sus && degree != null && (degree === 2 || degree === 4 || degree === 5)) {
+    const seventh = flags.seven || flags.nine || flags.eleven || flags.thirteen
+    return realize(chord.root, seventh ? 'dom7sus4' : 'sus4', chord.bass, key)
   }
+  for (const level of selectedLevels(flags)) {
+    const quality = extensionQuality(chord, degree, level)
+    if (quality) return realize(chord.root, quality, chord.bass, key)
+  }
+  return chord
+}
 
-  if (flags.sus) claim([5, 7], 'sus')
-  if (flags.thirteen) claim([5, 7, 2], '13')
-  if (flags.eleven) claim([4, 2, 6], '11')
-  if (flags.nine && !impliesNine(jobs)) claim([2, 5, 4], '9')
-  if (flags.seven) {
-    const preferred = pick(next, key, [5, 7], avoid, false)
-    if (preferred != null) {
-      addJob(jobs, preferred, '7')
-      avoid.add(preferred)
-    } else if (!impliesSeventh(jobs)) {
-      const sus = [...jobs.entries()].find(([, set]) => set.has('sus'))
-      if (sus) addJob(jobs, sus[0], '7')
-      else claim([5, 7, 1], '7')
+function selectedLevels(flags: ColorFlags): Level[] {
+  const levels: Level[] = []
+  if (flags.thirteen) levels.push('13')
+  if (flags.eleven) levels.push('11')
+  if (flags.nine) levels.push('9')
+  if (flags.seven) levels.push('7')
+  return levels
+}
+
+function extensionQuality(chord: ResolvedChord, degree: Degree | null, level: Level): QualityId | null {
+  const minor = MINORISH.has(chord.quality)
+  if (level === '11' && !minor && degree === 1) return null
+  if (level === '13') {
+    if (minor) return 'min13'
+    if (degree === 5 || degree === 7) return 'dom13'
+    if (degree === 1 || degree === 4) return 'maj13'
+    return 'dom13'
+  }
+  if (level === '11') return minor ? 'min11' : 'dom11'
+  if (level === '9') {
+    if (minor) return 'min9'
+    if (degree === 1 || degree === 4) return 'maj9'
+    return 'dom9'
+  }
+  if (chord.quality === 'dim') return 'm7b5'
+  if (minor) return 'min7'
+  if (degree === 1 || degree === 4) return 'maj7'
+  return 'dom7'
+}
+
+function insertDims(chords: ResolvedChord[], key: Key): ResolvedChord[] {
+  if (chords.length < 2) return chords
+  const out: ResolvedChord[] = []
+  const seen = new Set(
+    chords.filter((chord) => chord.quality === 'dim' || chord.quality === 'dim7').map((chord) => chord.root.pc),
+  )
+  for (let index = 0; index < chords.length; index += 1) {
+    const current = chords[index]
+    const next = chords[(index + 1) % chords.length]
+    out.push(current)
+    const rising = (next.root.pc - current.root.pc + 12) % 12
+    const candidates: Spelled[] = []
+    if (rising === 1 || rising === 2) {
+      const passing = spellInterval(current.root, 1, 0)
+      if (passing.pc !== next.root.pc && passing.pc !== current.root.pc) candidates.push(passing)
+    }
+    if (degreeOf(next, key) === 1) {
+      const lead = spellInterval(next.root, 11, 6)
+      if (lead.pc !== current.root.pc && lead.pc !== next.root.pc) candidates.push(lead)
+    }
+    for (const root of candidates) {
+      if (seen.has(root.pc)) continue
+      seen.add(root.pc)
+      out.push(realize(root, 'dim7', root, key))
     }
   }
-
-  for (const [index, set] of jobs) {
-    const chord = next[index]
-    if (!chord || locked.has(index)) continue
-    next[index] = realize(chord.root, qualityFor(chord, key, set), chord.bass, key)
-  }
-  return next
-}
-
-function anyColor(flags: ColorFlags): boolean {
-  return COLOR_BUTTONS.some((button) => flags[button.id])
-}
-
-function passingDim(after: ResolvedChord, key: Key): ResolvedChord {
-  const root = spellInterval(after.root, 1, 0)
-  return realize(root, 'dim7', root, key)
-}
-
-function addJob(jobs: Map<number, Set<Job>>, index: number, job: Job) {
-  const set = jobs.get(index) ?? new Set<Job>()
-  set.add(job)
-  jobs.set(index, set)
-}
-
-function impliesNine(jobs: Map<number, Set<Job>>): boolean {
-  return [...jobs.values()].some((set) => set.has('13') || set.has('11') || set.has('9'))
-}
-
-function impliesSeventh(jobs: Map<number, Set<Job>>): boolean {
-  return [...jobs.values()].some((set) => set.has('13') || set.has('11') || set.has('9') || set.has('7'))
-}
-
-function pick(
-  chords: ResolvedChord[],
-  key: Key,
-  prefer: Degree[],
-  avoid: Set<number>,
-  allowFallback: boolean,
-): number | null {
-  const degrees = chords.map((chord) => degreeOf(chord, key))
-  for (const wanted of prefer) {
-    const index = degrees.findIndex((degree, chordIndex) => degree === wanted && !avoid.has(chordIndex))
-    if (index >= 0) return index
-  }
-  if (!allowFallback) return null
-  const fallback = degrees.findIndex((_, chordIndex) => !avoid.has(chordIndex))
-  return fallback >= 0 ? fallback : null
+  return out
 }
 
 function degreeOf(chord: ResolvedChord, key: Key): Degree | null {
@@ -119,20 +115,4 @@ function degreeOf(chord: ResolvedChord, key: Key): Degree | null {
   } catch {
     return null
   }
-}
-
-function qualityFor(chord: ResolvedChord, key: Key, jobs: Set<Job>): QualityId {
-  const degree = degreeOf(chord, key)
-  const minor = MINORISH.has(chord.quality) || chord.quality === 'dim' || chord.quality === 'dim7'
-  if (jobs.has('sus')) return jobs.has('7') || jobs.has('9') || jobs.has('13') || jobs.has('11') ? 'dom7sus4' : 'sus4'
-  if (jobs.has('13')) return minor ? 'min13' : degree === 1 ? 'maj13' : 'dom13'
-  if (jobs.has('11')) return minor ? 'min11' : 'dom11'
-  if (jobs.has('9')) {
-    if (minor) return 'min9'
-    return degree === 1 ? 'maj9' : 'dom9'
-  }
-  if (chord.quality === 'dim' || chord.quality === 'dim7') return 'dim7'
-  if (minor) return 'min7'
-  if (degree === 1) return 'maj7'
-  return 'dom7'
 }

@@ -103,6 +103,42 @@ describe('piano accompaniments are distinct and follow note lifetimes', () => {
     expect(rolesAt(input, 3).bass).toEqual([progression[1].bassMidi])
   })
 
+  test('the added piano patterns are not copies of bass-and-chord', () => {
+    const plain = { voiced: progression, accompaniment: 'bass-chord' as const, loop: false }
+    const stride = rolesAt({ voiced: progression, accompaniment: 'stride', loop: false }, 2.1)
+    expect(stride.bass).toEqual([progression[0].bassMidi + 7])
+    expect(stride.rh).toEqual([])
+    expect(rolesAt(plain, 2.1).bass).toEqual([progression[0].bassMidi])
+
+    const walkEarly = rolesAt({ voiced: progression, accompaniment: 'walking', loop: false }, 0.1)
+    const walkLater = rolesAt({ voiced: progression, accompaniment: 'walking', loop: false }, 1.1)
+    expect(walkEarly.rh).toEqual([])
+    expect(walkEarly.bass).toEqual([progression[0].bassMidi])
+    expect(walkLater.bass).not.toEqual(walkEarly.bass)
+
+    const pedal = rolesAt({ voiced: progression, accompaniment: 'pedal', loop: false }, 3.2)
+    expect(pedal.bass).toEqual([progression[0].bassMidi])
+    expect(rolesAt({ voiced: progression, accompaniment: 'audition', loop: false }, 0.2).rh.length).toBeGreaterThan(0)
+    expect(rolesAt({ voiced: progression, accompaniment: 'pedal', loop: false }, 0.2).rh).toEqual([])
+
+    const octaves = rolesAt({ voiced: progression, accompaniment: 'broken-octaves', loop: false }, 0.6)
+    expect(octaves.bass).toEqual([progression[0].bassMidi + 12])
+    expect(octaves.rh).toEqual([])
+
+    const rock = rolesAt({ voiced: progression, accompaniment: 'rock', loop: false }, 0.1)
+    expect(rock.bass).toHaveLength(2)
+    expect(rolesAt({ voiced: progression, accompaniment: 'rock', loop: false }, 0.6).rh.length).toBeGreaterThan(1)
+
+    const march = rolesAt({ voiced: progression, accompaniment: 'march', loop: false }, 0.5)
+    expect(march.bass).toEqual([])
+    expect(rolesAt(plain, 0.5).bass).toEqual([progression[0].bassMidi])
+
+    const hymnLate = rolesAt({ voiced: progression, accompaniment: 'hymn', loop: false }, 3.7)
+    const heldLate = rolesAt({ voiced: progression, accompaniment: 'audition', loop: false }, 3.7)
+    expect(hymnLate.rh).toEqual([])
+    expect(heldLate.rh.length).toBeGreaterThan(0)
+  })
+
   test('the ballad holds the bass while a single right-hand note changes', () => {
     const input = { voiced: progression, accompaniment: 'ballad' as const, loop: false }
     const rolled = rolesAt(input, 0.6)
