@@ -61,6 +61,7 @@ Tempo is the quarter note. The accompaniment chooses its own shape. There is no 
 - **Plain chord** — one attack, then the chord holds.
 - **Block chords** — the whole chord together, twice in the bar.
 - **Bass and chord** — bass on 1 and 3, chord on 2 and 4.
+- **Swing shuffle** — swung eighths. Bass on 1 and 3, a short chord on the offbeat.
 - **Stride** — low bass on 1, the chord on 2, a higher bass note on 3, the chord again on 4.
 - **Walking bass** — root, chord tone, fifth, then a step toward the next chord.
 - **Pedal bass** — one bass note holds; the chord taps on 2 and 4.

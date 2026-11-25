@@ -98,13 +98,16 @@ describe('practice controls that left the desk', () => {
     for (const id of ['audition', 'block', 'bass-chord', 'arpeggio', 'alberti', 'waltz', 'ballad'] as const) {
       expect(ACCOMPANIMENT_IDS).toContain(id)
     }
-    for (const id of ['stride', 'walking', 'pedal', 'broken-octaves', 'rolled', 'pop-eighths', 'rock', 'hymn', 'jazz', 'gospel', 'bossa', 'march', 'tremolo', 'tresillo'] as const) {
+    for (const id of ['swing', 'stride', 'walking', 'pedal', 'broken-octaves', 'rolled', 'pop-eighths', 'rock', 'hymn', 'jazz', 'gospel', 'bossa', 'march', 'tremolo', 'tresillo'] as const) {
       expect(ACCOMPANIMENT_IDS).toContain(id)
     }
     expect(new Set(ACCOMPANIMENT_IDS).size).toBe(ACCOMPANIMENT_IDS.length)
     for (const id of ACCOMPANIMENT_IDS) {
       expect(ACCOMPANIMENTS[id].label.length).toBeGreaterThan(2)
       expect(ACCOMPANIMENTS[id].feel.length).toBeGreaterThan(20)
+    expect(ACCOMPANIMENT_IDS.indexOf('swing')).toBeLessThan(8)
+    expect(ACCOMPANIMENTS.swing.label).toBe('Swing shuffle')
+    expect(ACCOMPANIMENTS.swing.feel).toBe('Swung eighths. Bass on 1 and 3, a short chord on the offbeat.')
     }
   })
 })

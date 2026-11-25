@@ -5,6 +5,7 @@ export type AccompanimentId =
   | 'audition'
   | 'block'
   | 'bass-chord'
+  | 'swing'
   | 'arpeggio'
   | 'alberti'
   | 'waltz'
@@ -28,6 +29,7 @@ export const ACCOMPANIMENT_IDS: AccompanimentId[] = [
   'audition',
   'block',
   'bass-chord',
+  'swing',
   'stride',
   'walking',
   'pedal',
@@ -62,6 +64,11 @@ export const ACCOMPANIMENTS: Record<AccompanimentId, { label: string; feel: stri
   'bass-chord': {
     label: 'Bass and chord',
     feel: 'Bass on beats 1 and 3, the chord on beats 2 and 4.',
+    beatsPerChord: 4,
+  },
+  swing: {
+    label: 'Swing shuffle',
+    feel: 'Swung eighths. Bass on 1 and 3, a short chord on the offbeat.',
     beatsPerChord: 4,
   },
   arpeggio: {
@@ -186,10 +193,10 @@ export type PlanInput = {
 type Hit = {
   beat: number
   dur: number
-  part: 'bass' | 'rh-all' | 'rh-one'
+  part: 'bass' | 'rh-all' | 'rh-mid' | 'rh-one'
   arpIndex?: number
   /** Extra bass shape: octave doubles the note, fifth replaces it, walk picks a step. */
-  bass?: 'root' | 'octave' | 'upper' | 'fifth' | 'walk'
+  bass?: 'root' | 'octave' | 'upper' | 'fifth' | 'swing-fifth' | 'walk'
 }
 
 export function planWindow(input: PlanInput): PlannedNote[] {
@@ -308,6 +315,7 @@ function accompanimentHits(id: AccompanimentId, chord: VoicedChord): Hit[] {
       part: (beat % 2 === 0 ? 'bass' : 'rh-all') as Hit['part'],
     }))
   }
+  if (id === 'swing') return swingHits()
   if (id === 'arpeggio') return gridHits(0.5, beats, arpCycle(rhCount), 0.42, false)
   if (id === 'alberti') return gridHits(0.5, beats, albertiCycle(rhCount), 0.4, true)
   if (id === 'waltz') {
@@ -472,11 +480,27 @@ function rollCycle(rhCount: number): number[] {
   return [0]
 }
 
+const SWING_LONG = 2 / 3
+const SWING_SHORT = 1 / 3
+
+function swingHits(): Hit[] {
+  return [0, 2].flatMap((beat) => [
+    { beat, dur: SWING_LONG, part: 'bass' as const, bass: beat === 0 ? 'root' : 'swing-fifth' },
+    { beat: beat + SWING_LONG, dur: SWING_SHORT, part: 'rh-mid' as const },
+  ])
+}
+
 function midisFor(hit: Hit, chord: VoicedChord): number[] {
   if (hit.part === 'bass') return bassMidis(hit, chord)
   if (hit.part === 'rh-all') return [...chord.rhMidis]
+  if (hit.part === 'rh-mid') return midChord(chord)
   if (chord.rhMidis.length === 0) return []
   return [chord.rhMidis[(hit.arpIndex ?? 0) % chord.rhMidis.length]]
+}
+
+function midChord(chord: VoicedChord): number[] {
+  const notes = [...chord.rhMidis].sort((left, right) => left - right)
+  return notes.slice(0, Math.min(3, notes.length))
 }
 
 function bassMidis(hit: Hit, chord: VoicedChord): number[] {
@@ -484,6 +508,7 @@ function bassMidis(hit: Hit, chord: VoicedChord): number[] {
   if (hit.bass === 'octave') return [root, Math.min(root + 12, 76)]
   if (hit.bass === 'upper') return [Math.min(root + 12, 76)]
   if (hit.bass === 'fifth') return [Math.min(root + 7, 70)]
+  if (hit.bass === 'swing-fifth') return [swingFifth(chord)]
   if (hit.bass === 'walk') return [walkMidi(chord, hit.arpIndex ?? 0)]
   return [root]
 }
@@ -498,6 +523,14 @@ function walkMidi(chord: VoicedChord, step: number): number {
   let midi = root + ((thirdPc - mod12(root) + 12) % 12)
   if (midi <= root) midi += 12
   return Math.min(midi, 72)
+}
+
+function swingFifth(chord: VoicedChord): number {
+  const root = chord.bassMidi
+  const fifthPc = mod12(root + 7)
+  const hasPerfectFifth = chord.chord.tones.some((tone) => mod12(tone.pc) === fifthPc)
+  if (!hasPerfectFifth || root + 7 > 70) return root
+  return root + 7
 }
 
 function mod12(midi: number): number {

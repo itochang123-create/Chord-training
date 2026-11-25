@@ -139,6 +139,37 @@ describe('piano accompaniments are distinct and follow note lifetimes', () => {
     expect(heldLate.rh.length).toBeGreaterThan(0)
   })
 
+  test('swing shuffle is long-short, with a short chord only on the offbeat of 1 and 3', () => {
+    const input = { voiced: progression, accompaniment: 'swing' as const, loop: false }
+    const long = 2 / 3
+    const onBeat = rolesAt(input, 0.1)
+    expect(onBeat.bass).toEqual([progression[0].bassMidi])
+    expect(onBeat.rh).toEqual([])
+    const straightEighth = rolesAt(input, 0.5)
+    expect(straightEighth.bass).toEqual([progression[0].bassMidi])
+    expect(straightEighth.rh).toEqual([])
+    const offbeat = rolesAt(input, long + 0.02)
+    expect(offbeat.bass).toEqual([])
+    expect(offbeat.rh.length).toBeGreaterThanOrEqual(2)
+    expect(offbeat.rh.length).toBeLessThanOrEqual(3)
+    expect(offbeat.rh).toEqual([...progression[0].rhMidis].sort((left, right) => left - right).slice(0, 3))
+    expect(rolesAt(input, 1.2)).toEqual({ bass: [], rh: [] })
+    expect(rolesAt(input, 2.1).bass).toEqual([progression[0].bassMidi + 7])
+    expect(rolesAt(input, 2.1).rh).toEqual([])
+    expect(rolesAt(input, 2 + long + 0.02).rh.length).toBeGreaterThanOrEqual(2)
+    expect(rolesAt(input, 3.2)).toEqual({ bass: [], rh: [] })
+    expect(frameAt(input, long + 0.02).active).toEqual(soundingAt(input, long + 0.02))
+    const rockOff = rolesAt({ voiced: progression, accompaniment: 'rock', loop: false }, 0.55)
+    expect(rockOff.rh.length).toBeGreaterThan(0)
+    expect(rolesAt(input, 0.55).rh).toEqual([])
+  })
+
+  test('swing uses the root again when the chord has no perfect fifth', () => {
+    const diminished = voiced('Cdim')
+    const fifth = rolesAt({ voiced: diminished, accompaniment: 'swing', loop: false }, 2.1)
+    expect(fifth.bass).toEqual([diminished[0].bassMidi])
+  })
+
   test('the ballad holds the bass while a single right-hand note changes', () => {
     const input = { voiced: progression, accompaniment: 'ballad' as const, loop: false }
     const rolled = rolesAt(input, 0.6)
