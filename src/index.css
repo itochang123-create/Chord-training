@@ -104,7 +104,7 @@ button.play[aria-pressed='true'] { color: var(--brass-ink); }
   line-height: 0.85;
 }
 
-.tagline, .help, .hint, .beat-readout, .inversion, .omission, footer p {
+.tagline, .help, .hint, .sound-check, .beat-readout, .inversion, .omission, footer p {
   color: var(--muted);
   line-height: 1.45;
 }
@@ -318,6 +318,8 @@ button.play[aria-pressed='true'] { color: var(--brass-ink); }
   padding: 0;
   background: transparent;
 }
+
+.hint.sound-check { color: var(--brass); }
 
 .transport button { background: #2c261f; }
 

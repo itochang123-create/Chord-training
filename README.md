@@ -89,7 +89,7 @@ Triads, 6ths, sus chords, and 7ths sound every chord tone. 9ths and 13ths leave 
 
 ## Safari and other browsers
 
-Sound uses the Web Audio API only. It starts after Play, Pause, Stop, or Restart, because browsers will not start audio without a gesture. Scheduling looks ahead on the audio clock and cancels voices when you stop or change the loop, so Play does not stack a second copy. If the tab is hidden or the system interrupts audio, Chord pauses and waits for Play again. The master level is capped and compressed.
+Sound uses the Web Audio oscillator synth only. There is no sample download. It starts after Play, Pause, Stop, or Restart, because browsers will not start audio without a gesture. On iPhone, Play also opens a playback audio session and a silent looping media element so the ring/silent switch does not mute the synth. Scheduling looks ahead on the audio clock, a little after the clock time once the context is running, and cancels voices when you stop or change the loop, so Play does not stack a second copy. If the tab is hidden, the phone locks, or iOS interrupts audio, Chord pauses and waits for Play again. If the context is still not running after a tap, the page says to tap Play again and check the silent switch and volume. The master level is capped and compressed.
 
 Space plays or pauses when focus is not in a control. Escape stops.
 

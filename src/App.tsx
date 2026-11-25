@@ -204,6 +204,7 @@ export default function App() {
         frame={frame}
         canPlay={settings.workspace === 'quiz' ? Boolean(quiz) : resolved.ok && voiced.length > 0}
         loop={settings.loop}
+        onPrime={() => engine.prime()}
         onPlay={() => {
           if (settings.workspace === 'quiz') void playQuiz()
           else void engine.play()
@@ -247,6 +248,7 @@ export default function App() {
             score={quiz.score}
             playing={frame.status === 'playing'}
             onDifficulty={(quizDifficulty) => patch({ quizDifficulty })}
+            onPrime={() => engine.prime()}
             onPlay={() => void playQuiz()}
             onReplay={() => void replayQuiz()}
             onAnswer={answer}

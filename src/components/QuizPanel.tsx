@@ -9,6 +9,7 @@ export function QuizPanel({
   playing,
   onDifficulty,
   onPlay,
+  onPrime,
   onReplay,
   onAnswer,
   onNext,
@@ -21,6 +22,7 @@ export function QuizPanel({
   playing: boolean
   onDifficulty: (difficulty: Difficulty) => void
   onPlay: () => void
+  onPrime: () => void
   onReplay: () => void
   onAnswer: (id: string) => void
   onNext: () => void
@@ -48,10 +50,18 @@ export function QuizPanel({
           : 'These loops use color on some chords only. A 13th or a sus chord is not copied onto the others. The key stays hidden until you answer.'}
       </p>
       <div className="transport-buttons">
-        <button type="button" className="play" data-testid="quiz-play" onClick={onPlay} disabled={playing}>
+        <button
+          type="button"
+          className="play"
+          data-testid="quiz-play"
+          onPointerDown={onPrime}
+          onTouchEnd={onPrime}
+          onClick={onPlay}
+          disabled={playing}
+        >
           {playing ? 'Playing' : 'Play'}
         </button>
-        <button type="button" data-testid="quiz-replay" onClick={onReplay}>
+        <button type="button" data-testid="quiz-replay" onPointerDown={onPrime} onTouchEnd={onPrime} onClick={onReplay}>
           Replay
         </button>
       </div>

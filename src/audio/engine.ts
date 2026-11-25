@@ -1,4 +1,11 @@
 import type { VoicedChord } from '../theory/chord.ts'
+import {
+  SCHEDULE_LEAD,
+  SILENT_LOOP_WAV,
+  audioContextConstructor,
+  contextIsRunning,
+  enablePlaybackSession,
+} from './ios.ts'
 import { beatsPerChord, frameAt, planWindow, selectDispatches, type AccompanimentId, type PlannedNote } from './plan.ts'
 import { secondsPerBeat } from './meter.ts'
 import { TransportGate, type TransportStatus } from './transport.ts'
@@ -16,6 +23,7 @@ export type VisualFrame = {
   status: TransportStatus
   interrupted: boolean
   audioReady: boolean
+  soundCheck: boolean
   chordIndex: number
   chordBeatIndex: number
   barBeatIndex: number
@@ -52,6 +60,7 @@ function framesEqual(a: VisualFrame, b: VisualFrame): boolean {
     a.status !== b.status ||
     a.interrupted !== b.interrupted ||
     a.audioReady !== b.audioReady ||
+    a.soundCheck !== b.soundCheck ||
     a.chordIndex !== b.chordIndex ||
     a.chordBeatIndex !== b.chordBeatIndex ||
     a.barBeatIndex !== b.barBeatIndex ||
@@ -70,6 +79,7 @@ function framesEqual(a: VisualFrame, b: VisualFrame): boolean {
 export class PlaybackEngine {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
+  private silentMedia: HTMLAudioElement | null = null
   private voices = new Set<Voice>()
   private gate = new TransportGate()
   private config: PerformanceConfig = EMPTY
@@ -80,10 +90,12 @@ export class PlaybackEngine {
   private dispatched = new Set<string>()
   private listeners = new Set<() => void>()
   private heard = false
+  private soundCheck = false
   private frame: VisualFrame = {
     status: 'stopped',
     interrupted: false,
     audioReady: false,
+    soundCheck: false,
     chordIndex: 0,
     chordBeatIndex: 0,
     barBeatIndex: 0,
@@ -91,7 +103,10 @@ export class PlaybackEngine {
   }
 
   constructor() {
-    document.addEventListener('visibilitychange', this.onHide)
+    document.addEventListener('visibilitychange', this.onVisibility)
+    document.addEventListener('pointerdown', this.prime, true)
+    document.addEventListener('touchend', this.prime, true)
+    enablePlaybackSession(navigator)
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -126,23 +141,40 @@ export class PlaybackEngine {
     this.silence()
     this.dispatched.clear()
     this.originBeat = beat
-    this.originAudio = this.ctx.currentTime + 0.03
+    this.originAudio = this.ctx.currentTime + SCHEDULE_LEAD
     this.publish()
   }
 
+  /** Run from the tap itself, before any await, so iOS still treats it as a gesture. */
+  prime = (): void => {
+    enablePlaybackSession(navigator)
+    this.startSilentMedia()
+    if (!this.ctx) this.createContext()
+    if (!this.ctx) return
+    void this.ctx.resume()
+    this.blip()
+  }
+
   async play(): Promise<void> {
+    this.prime()
     const request = this.gate.requestPlay()
-    if (request.type === 'ignore') return
+    if (request.type === 'ignore') {
+      this.soundCheck = !this.isRunning()
+      this.publish()
+      return
+    }
     try {
-      await this.ensureRunning()
+      await this.waitUntilRunning()
     } catch {
+      this.soundCheck = true
       this.publish()
       return
     }
     if (!this.ctx || !this.gate.commit(request.token)) return
     this.heard = true
+    this.soundCheck = !this.isRunning()
     this.originBeat = request.fromBeat
-    this.originAudio = this.ctx.currentTime + 0.05
+    this.originAudio = this.ctx.currentTime + SCHEDULE_LEAD
     this.dispatched.clear()
     this.silence()
     this.startLoops()
@@ -177,15 +209,32 @@ export class PlaybackEngine {
   }
 
   dispose(): void {
-    document.removeEventListener('visibilitychange', this.onHide)
+    document.removeEventListener('visibilitychange', this.onVisibility)
+    document.removeEventListener('pointerdown', this.prime, true)
+    document.removeEventListener('touchend', this.prime, true)
     this.ctx?.removeEventListener('statechange', this.onState)
+    this.silentMedia?.pause()
     this.stop()
     void this.ctx?.close()
     this.ctx = null
   }
 
-  private onHide = (): void => {
-    if (document.hidden && this.gate.status === 'playing') this.interrupt()
+  private onVisibility = (): void => {
+    if (document.hidden) {
+      if (this.gate.status === 'playing') this.interrupt()
+      return
+    }
+    if (!this.ctx || this.isRunning()) return
+    void this.ctx.resume().then(
+      () => {
+        this.soundCheck = !this.isRunning()
+        this.publish()
+      },
+      () => {
+        this.soundCheck = true
+        this.publish()
+      },
+    )
   }
 
   private onState = (): void => {
@@ -200,15 +249,25 @@ export class PlaybackEngine {
     this.publish()
   }
 
-  private async ensureRunning(): Promise<void> {
-    if (!this.ctx) this.createContext()
+  private async waitUntilRunning(): Promise<void> {
     if (!this.ctx) throw new Error('Audio is unavailable')
-    if (this.ctx.state !== 'running') await this.ctx.resume()
-    if (this.ctx.state !== 'running') throw new Error('Audio did not start')
+    if (!this.isRunning()) await this.ctx.resume()
+    if (!this.isRunning()) throw new Error('Audio did not start')
+  }
+
+  private isRunning(): boolean {
+    return this.ctx != null && contextIsRunning(this.ctx.state)
   }
 
   private createContext(): void {
-    const ctx = new AudioContext()
+    const Ctor = audioContextConstructor(window)
+    if (!Ctor) return
+    let ctx: AudioContext
+    try {
+      ctx = new Ctor()
+    } catch {
+      return
+    }
     const master = ctx.createGain()
     master.gain.value = safeGain(this.config.volume)
     const compressor = ctx.createDynamicsCompressor()
@@ -222,6 +281,34 @@ export class PlaybackEngine {
     ctx.addEventListener('statechange', this.onState)
     this.ctx = ctx
     this.master = master
+  }
+
+  private startSilentMedia(): void {
+    if (typeof document === 'undefined') return
+    if (!this.silentMedia) {
+      const audio = document.createElement('audio')
+      audio.setAttribute('playsinline', 'true')
+      audio.setAttribute('webkit-playsinline', 'true')
+      audio.loop = true
+      audio.preload = 'auto'
+      audio.src = SILENT_LOOP_WAV
+      this.silentMedia = audio
+    }
+    const pending = this.silentMedia.play()
+    if (pending) void pending.catch(() => undefined)
+  }
+
+  private blip(): void {
+    if (!this.ctx) return
+    try {
+      const buffer = this.ctx.createBuffer(1, 1, this.ctx.sampleRate || 44100)
+      const source = this.ctx.createBufferSource()
+      source.buffer = buffer
+      source.connect(this.ctx.destination)
+      source.start(this.ctx.currentTime)
+    } catch {
+      // The one-sample unlock can throw if the context is already closed.
+    }
   }
 
   private applyVolume(volume: number): void {
@@ -273,7 +360,11 @@ export class PlaybackEngine {
       const end = this.audioTime(note.endBeat)
       if (end <= this.ctx.currentTime + 0.02) continue
       this.dispatched.add(note.id)
-      this.startVoice(note, Math.max(start, this.ctx.currentTime + 0.005), end)
+      try {
+        this.startVoice(note, Math.max(start, this.ctx.currentTime + 0.02), end)
+      } catch {
+        this.soundCheck = true
+      }
     }
   }
 
@@ -398,7 +489,8 @@ export class PlaybackEngine {
     return {
       status: this.gate.status,
       interrupted: this.gate.interrupted,
-      audioReady: this.heard && this.ctx?.state === 'running',
+      audioReady: this.heard && this.isRunning(),
+      soundCheck: this.soundCheck,
       chordIndex: info.chordIndex,
       chordBeatIndex: info.chordBeatIndex,
       barBeatIndex: info.barBeatIndex,
