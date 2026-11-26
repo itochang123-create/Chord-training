@@ -6,6 +6,9 @@ export type AccompanimentId =
   | 'block'
   | 'bass-chord'
   | 'swing'
+  | 'boogie'
+  | 'jump'
+  | 'bebop'
   | 'arpeggio'
   | 'alberti'
   | 'waltz'
@@ -30,6 +33,9 @@ export const ACCOMPANIMENT_IDS: AccompanimentId[] = [
   'block',
   'bass-chord',
   'swing',
+  'boogie',
+  'jump',
+  'bebop',
   'stride',
   'walking',
   'pedal',
@@ -69,6 +75,21 @@ export const ACCOMPANIMENTS: Record<AccompanimentId, { label: string; feel: stri
   swing: {
     label: 'Swing shuffle',
     feel: 'Swung eighths. Bass on 1 and 3, a short chord on the offbeat.',
+    beatsPerChord: 4,
+  },
+  boogie: {
+    label: 'Boogie-woogie',
+    feel: 'Swung eighths. The left hand walks root, 3rd, 5th, 6th, and flat 7. Short chords on the and of 2 and 4.',
+    beatsPerChord: 4,
+  },
+  jump: {
+    label: 'Jump blues',
+    feel: 'A driving shuffle. Left hand rocks root-and-fifth with root-and-sixth, and the right hand punches 2 and 4.',
+    beatsPerChord: 4,
+  },
+  bebop: {
+    label: 'Bebop comp',
+    feel: 'Walking quarter-note bass into the next root. The right hand comps short rootless chords on swung offbeats.',
     beatsPerChord: 4,
   },
   arpeggio: {
@@ -193,10 +214,13 @@ export type PlanInput = {
 type Hit = {
   beat: number
   dur: number
-  part: 'bass' | 'rh-all' | 'rh-mid' | 'rh-one'
+  part: 'bass' | 'rh-all' | 'rh-mid' | 'rh-one' | 'rh-shell'
   arpIndex?: number
   /** Extra bass shape: octave doubles the note, fifth replaces it, walk picks a step. */
   bass?: 'root' | 'octave' | 'upper' | 'fifth' | 'swing-fifth' | 'walk'
+  /** Sounding pitches already chosen for this hit. */
+  midis?: number[]
+  velocity?: number
 }
 
 export function planWindow(input: PlanInput): PlannedNote[] {
@@ -216,7 +240,8 @@ export function planWindow(input: PlanInput): PlannedNote[] {
     const chordIndex = ((instance % voiced.length) + voiced.length) % voiced.length
     const chordStart = instance * beats
     const chord = voiced[chordIndex]
-    const hits = accompanimentHits(input.accompaniment, chord)
+    const next = voiced[(chordIndex + 1) % voiced.length]
+    const hits = accompanimentHits(input.accompaniment, chord, next, instance)
     hits.forEach((hit, hitIndex) => {
       const startBeat = chordStart + hit.beat
       const endBeat = Math.min(chordStart + beats, startBeat + hit.dur)
@@ -229,7 +254,7 @@ export function planWindow(input: PlanInput): PlannedNote[] {
           endBeat,
           role: hit.part === 'bass' ? 'bass' : 'rh',
           chordIndex,
-          velocity: hit.part === 'bass' ? 0.92 : 0.76,
+          velocity: hit.velocity ?? (hit.part === 'bass' ? 0.92 : 0.76),
           accent: false,
         })
       })
@@ -293,7 +318,7 @@ export function chordSeconds(bpm: number, id: AccompanimentId): number {
   return beatsPerChord(id) * secondsPerBeat(bpm)
 }
 
-function accompanimentHits(id: AccompanimentId, chord: VoicedChord): Hit[] {
+function accompanimentHits(id: AccompanimentId, chord: VoicedChord, next: VoicedChord, bar: number): Hit[] {
   const beats = beatsPerChord(id)
   const rhCount = chord.rhMidis.length
   if (id === 'audition') {
@@ -316,6 +341,9 @@ function accompanimentHits(id: AccompanimentId, chord: VoicedChord): Hit[] {
     }))
   }
   if (id === 'swing') return swingHits()
+  if (id === 'boogie') return boogieHits(chord)
+  if (id === 'jump') return jumpHits(chord)
+  if (id === 'bebop') return bebopHits(chord, next, bar)
   if (id === 'arpeggio') return gridHits(0.5, beats, arpCycle(rhCount), 0.42, false)
   if (id === 'alberti') return gridHits(0.5, beats, albertiCycle(rhCount), 0.4, true)
   if (id === 'waltz') {
@@ -491,6 +519,7 @@ function swingHits(): Hit[] {
 }
 
 function midisFor(hit: Hit, chord: VoicedChord): number[] {
+  if (hit.midis) return hit.midis
   if (hit.part === 'bass') return bassMidis(hit, chord)
   if (hit.part === 'rh-all') return [...chord.rhMidis]
   if (hit.part === 'rh-mid') return midChord(chord)
@@ -535,4 +564,106 @@ function swingFifth(chord: VoicedChord): number {
 
 function mod12(midi: number): number {
   return ((midi % 12) + 12) % 12
+}
+
+const MINOR_WALK = new Set(['min', 'min6', 'min7', 'min9', 'min11', 'min13', 'm7b5', 'dim', 'dim7'])
+
+function patternRoot(chord: VoicedChord): number {
+  return 36 + mod12(chord.chord.root.pc)
+}
+
+function boogieThird(chord: VoicedChord): number {
+  return MINOR_WALK.has(chord.chord.quality) ? 3 : 4
+}
+
+function swingEighthTimes(): number[] {
+  const times: number[] = []
+  for (let beat = 0; beat < 4; beat += 1) times.push(beat, beat + SWING_LONG)
+  return times
+}
+
+function boogieHits(chord: VoicedChord): Hit[] {
+  const root = patternRoot(chord)
+  const third = boogieThird(chord)
+  const steps = [0, third, 7, 9, 10, 9, 7, third]
+  const times = swingEighthTimes()
+  const hits: Hit[] = times.map((beat, index) => ({
+    beat,
+    dur: (times[index + 1] ?? 4) - beat,
+    part: 'bass' as const,
+    midis: [root + steps[index]],
+  }))
+  for (const beat of [1 + SWING_LONG, 3 + SWING_LONG]) {
+    hits.push({ beat, dur: 0.22, part: 'rh-mid', velocity: 0.48 })
+  }
+  return hits
+}
+
+function jumpHits(chord: VoicedChord): Hit[] {
+  const root = patternRoot(chord)
+  const times = swingEighthTimes()
+  const hits: Hit[] = times.map((beat, index) => {
+    const color = index === times.length - 1 ? 10 : index % 2 === 0 ? 7 : 9
+    return {
+      beat,
+      dur: (times[index + 1] ?? 4) - beat,
+      part: 'bass' as const,
+      midis: [root, root + color],
+    }
+  })
+  for (const beat of [1, 3]) {
+    hits.push({ beat, dur: 0.22, part: 'rh-mid', velocity: 0.84 })
+  }
+  return hits
+}
+
+function bebopHits(chord: VoicedChord, next: VoicedChord, bar: number): Hit[] {
+  const root = patternRoot(chord)
+  const third = root + boogieThird(chord)
+  const fifth = root + 7
+  const approach = nearestPc(mod12(patternRoot(next) - 1), fifth)
+  const bass = [root, third, fifth, approach]
+  const hits: Hit[] = bass.map((midi, beat) => ({
+    beat,
+    dur: 0.9,
+    part: 'bass' as const,
+    midis: [midi],
+  }))
+  const comps = bar % 2 === 0 ? [SWING_LONG, 2] : [1 + SWING_LONG, 3 + SWING_LONG]
+  for (const beat of comps) {
+    hits.push({ beat, dur: 0.22, part: 'rh-shell', midis: shellMidis(chord), velocity: 0.62 })
+  }
+  return hits
+}
+
+function shellMidis(chord: VoicedChord): number[] {
+  const third = degreeMidi(chord, '3rd', 64) ?? degreeMidi(chord, '4th', 65)
+  const seventh = degreeMidi(chord, '7th', 70)
+  const fifth = degreeMidi(chord, '5th', 67)
+  const notes: number[] = []
+  if (third != null) notes.push(third)
+  if (seventh != null) notes.push(seventh)
+  else if (fifth != null) notes.push(fifth)
+  const quality = chord.chord.quality
+  if (quality === 'dom13' || quality === 'maj13' || quality === 'min13') {
+    const thirteenth = degreeMidi(chord, '13th', 74)
+    if (thirteenth != null) notes.push(thirteenth)
+  } else if (quality === 'dom9' || quality === 'maj9' || quality === 'min9' || quality === 'dom11' || quality === 'min11') {
+    const ninth = degreeMidi(chord, '9th', 72)
+    if (ninth != null) notes.push(ninth)
+  }
+  if (notes.length === 0) return midChord(chord)
+  return [...new Set(notes)].sort((left, right) => left - right)
+}
+
+function degreeMidi(chord: VoicedChord, label: string, center: number): number | null {
+  const tone = chord.chord.tones.find((item) => item.degreeLabel === label)
+  if (!tone) return null
+  return nearestPc(tone.pc, center)
+}
+
+function nearestPc(pc: number, near: number): number {
+  const base = near - mod12(near - pc)
+  const options = [base - 12, base, base + 12]
+  return options.reduce((best, midi) => (Math.abs(midi - near) < Math.abs(best - near) ? midi : best))
 }

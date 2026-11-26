@@ -164,6 +164,55 @@ describe('piano accompaniments are distinct and follow note lifetimes', () => {
     expect(rolesAt(input, 0.55).rh).toEqual([])
   })
 
+  test('boogie, jump, and bebop keep their own swing shapes', () => {
+    const major = voiced('C')
+    const boogie = { voiced: major, accompaniment: 'boogie' as const, loop: false }
+    const root = rolesAt(boogie, 0.02).bass[0]
+    const steps = [0, 4, 7, 9, 10, 9, 7, 4]
+    const times = [0, 2 / 3, 1, 1 + 2 / 3, 2, 2 + 2 / 3, 3, 3 + 2 / 3]
+    times.forEach((time, index) => {
+      expect(rolesAt(boogie, time + 0.02).bass).toEqual([root + steps[index]])
+    })
+    expect(rolesAt(boogie, 0.02).rh).toEqual([])
+    expect(rolesAt(boogie, 1 + 2 / 3 + 0.02).rh.length).toBeGreaterThan(0)
+    expect(root).toBeGreaterThanOrEqual(36)
+    expect(root + 10).toBeLessThanOrEqual(58)
+
+    const minor = { voiced: voiced('Cm'), accompaniment: 'boogie' as const, loop: false }
+    const minorRoot = rolesAt(minor, 0.02).bass[0]
+    expect(rolesAt(minor, 2 / 3 + 0.02).bass).toEqual([minorRoot + 3])
+
+    const jump = { voiced: major, accompaniment: 'jump' as const, loop: false }
+    expect(rolesAt(jump, 0.02).bass).toEqual([root, root + 7])
+    expect(rolesAt(jump, 0.02).rh).toEqual([])
+    expect(rolesAt(jump, 2 / 3 + 0.02).bass).toEqual([root, root + 9])
+    expect(rolesAt(jump, 3 + 2 / 3 + 0.02).bass).toEqual([root, root + 10])
+    expect(rolesAt(jump, 1.02).rh.length).toBeGreaterThanOrEqual(2)
+    expect(rolesAt({ voiced: major, accompaniment: 'swing', loop: false }, 1.02)).toEqual({ bass: [], rh: [] })
+    expect(rolesAt(jump, 1.02).bass.length).toBe(2)
+
+    const bebop = { voiced: voiced('C G'), accompaniment: 'bebop' as const, loop: false }
+    const walkRoot = rolesAt(bebop, 0.05).bass
+    expect(walkRoot).toHaveLength(1)
+    expect(walkRoot[0]! % 12).toBe(0)
+    expect(rolesAt(bebop, 1.05).bass[0]! % 12).toBe(4)
+    const approach = rolesAt(bebop, 3.05).bass[0]! % 12
+    const distance = (approach - 7 + 12) % 12
+    expect(Math.min(distance, 12 - distance)).toBe(1)
+    expect(rolesAt(bebop, 2 / 3 + 0.02).rh.length).toBeGreaterThanOrEqual(2)
+    expect(rolesAt(bebop, 4 + 2 / 3 + 0.02).rh).toEqual([])
+    expect(rolesAt(bebop, 4 + 1 + 2 / 3 + 0.02).rh.length).toBeGreaterThanOrEqual(2)
+    expect(frameAt(boogie, 0.02).active).toEqual(soundingAt(boogie, 0.02))
+  })
+
+  test('bebop shells stay rootless and add 13 only when the chord has one', () => {
+    const triad = rolesAt({ voiced: voiced('C'), accompaniment: 'bebop', loop: false }, 2 / 3 + 0.02)
+    expect(triad.rh.every((midi) => midi % 12 !== 0)).toBe(true)
+    const colored = rolesAt({ voiced: voiced('C13'), accompaniment: 'bebop', loop: false }, 2 / 3 + 0.02)
+    expect(colored.rh.some((midi) => midi % 12 === 9)).toBe(true)
+    expect(colored.rh.some((midi) => midi % 12 === 0)).toBe(false)
+  })
+
   test('swing uses the root again when the chord has no perfect fifth', () => {
     const diminished = voiced('Cdim')
     const fifth = rolesAt({ voiced: diminished, accompaniment: 'swing', loop: false }, 2.1)
