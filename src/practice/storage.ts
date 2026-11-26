@@ -6,7 +6,7 @@ import type { Difficulty } from './quiz.ts'
 export const PRACTICE_TONIC = 'C' as const
 export const PRACTICE_VOLUME = 0.8
 
-export type Workspace = 'practice' | 'listen' | 'quiz'
+export type Workspace = 'name' | 'practice' | 'listen' | 'quiz'
 
 export type SavedPreset = {
   id: string
@@ -90,7 +90,7 @@ function sanitize(value: Partial<Settings>): Settings {
     accompaniment: typeof value.accompaniment === 'string' && isAccompanimentId(value.accompaniment) ? value.accompaniment : 'bass-chord',
     colors: sanitizeColors(value.colors),
     loop: value.loop !== false,
-    workspace: value.workspace === 'listen' || value.workspace === 'quiz' ? value.workspace : 'practice',
+    workspace: value.workspace === 'name' || value.workspace === 'listen' || value.workspace === 'quiz' ? value.workspace : 'practice',
     quizDifficulty: difficulty,
     presets: Array.isArray(value.presets) ? value.presets.map(sanitizePreset).filter((preset) => preset.name && preset.text).slice(0, 40) : [],
   }

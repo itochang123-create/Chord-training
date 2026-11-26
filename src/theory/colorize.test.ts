@@ -88,9 +88,11 @@ describe('practice controls that left the desk', () => {
 
   test('Play sits above the Practice tab and is not repeated under the keyboard', () => {
     const transport = appSource.indexOf('<Transport')
-    const practice = appSource.indexOf("? 'Practice'")
+    const name = appSource.indexOf('Name the chord')
+    const practice = appSource.indexOf("'Practice'")
     expect(transport).toBeGreaterThan(-1)
-    expect(transport).toBeLessThan(practice)
+    expect(transport).toBeLessThan(name)
+    expect(name).toBeLessThan(practice)
     expect(appSource.indexOf('<Transport', transport + 1)).toBe(-1)
   })
 

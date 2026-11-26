@@ -379,6 +379,16 @@ input[type='range'] {
 .quiz h2 { font-size: clamp(2rem, 5vw, 3.2rem); max-width: 16ch; }
 .score { margin: 0; color: var(--brass); }
 
+.name-answers {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+.name-answers .choice { text-align: center; min-height: 52px; }
+.name-actions { margin-top: 14px; }
+.name-chord h2 { font-size: clamp(2.4rem, 8vw, 4.4rem); }
+
 .choices { display: grid; gap: 8px; margin-top: 14px; }
 .choice {
   width: 100%;

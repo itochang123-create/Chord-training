@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { performanceSignature, PlaybackEngine, type PerformanceConfig } from './audio/engine.ts'
 import { ACCOMPANIMENTS } from './audio/plan.ts'
+import { NameChordPanel } from './components/NameChordPanel.tsx'
 import { Piano } from './components/Piano.tsx'
 import { QuizPanel } from './components/QuizPanel.tsx'
 import { Setup } from './components/Setup.tsx'
@@ -12,8 +13,17 @@ import { applyColors } from './theory/colorize.ts'
 import { makeKey, prettify } from './theory/pitch.ts'
 import { resolveProgression } from './theory/resolve.ts'
 import { grade, makeQuestion, type Grade, type QuizPublic, type QuizSecret } from './practice/quiz.ts'
+import { makeNameTrial, namePerformance, type NameAnswer, type NameTrial } from './practice/nameChord.ts'
 import { stageModel } from './practice/stageModel.ts'
 import { PRACTICE_VOLUME, saveSettings, type SavedPreset, type Settings, loadSettings } from './practice/storage.ts'
+
+type NameView = {
+  key: string
+  trial: NameTrial
+  picked: NameAnswer | null
+  correct: boolean | null
+  score: { correct: number; answered: number }
+}
 
 type QuizView = {
   key: string
@@ -32,6 +42,9 @@ export default function App() {
   const [quizSession, setQuizSession] = useState(0)
   const [quizRound, setQuizRound] = useState(0)
   const [quiz, setQuiz] = useState<QuizView | null>(null)
+  const [nameRound, setNameRound] = useState(0)
+  const [nameView, setNameView] = useState<NameView | null>(null)
+  const [hearArpeggio, setHearArpeggio] = useState(false)
   const quizKey = settings.workspace === 'quiz' ? `${quizSession}:${settings.quizDifficulty}:${quizRound}` : null
   if (quizKey && quiz?.key !== quizKey) {
     const made = makeQuestion(settings.quizDifficulty, Math.random)
@@ -44,6 +57,17 @@ export default function App() {
       correctChoiceId: null,
       secret: made.secret,
       score: sameSitting && quiz ? quiz.score : { correct: 0, answered: 0, streak: 0 },
+    })
+  }
+  const nameKey = settings.workspace === 'name' ? String(nameRound) : null
+  if (nameKey && nameView?.key !== nameKey) {
+    const trial = makeNameTrial(Math.random)
+    setNameView({
+      key: nameKey,
+      trial,
+      picked: null,
+      correct: null,
+      score: nameView ? nameView.score : { correct: 0, answered: 0 },
     })
   }
   const engine = useMemo(() => new PlaybackEngine(), [])
@@ -66,12 +90,13 @@ export default function App() {
     saveSettings(settings)
   }, [settings])
   useEffect(() => {
-    if (settings.workspace === 'quiz') return
+    if (settings.workspace === 'quiz' || settings.workspace === 'name') return
     engine.setPerformance(practiceConfig)
   }, [engine, practiceConfig, settings.workspace])
   useEffect(() => {
+    if (settings.workspace === 'quiz' || settings.workspace === 'name') return
     if (!resolved.ok) engine.stop()
-  }, [engine, resolved])
+  }, [engine, resolved, settings.workspace])
   useEffect(() => {
     if (settings.workspace !== 'quiz' || !quiz) return
     if (quizSound.current !== quiz.secret) {
@@ -80,6 +105,12 @@ export default function App() {
     }
     engine.setPerformance(quizPerformance(quiz.secret))
   }, [engine, quiz, settings.workspace])
+  const nameTrial = nameView?.trial
+  useEffect(() => {
+    if (settings.workspace !== 'name' || !nameTrial) return
+    engine.stop()
+    engine.setPerformance(namePerformance(nameTrial, hearArpeggio))
+  }, [engine, hearArpeggio, nameTrial, settings.workspace])
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target
@@ -87,6 +118,12 @@ export default function App() {
       if (event.code === 'Space') {
         event.preventDefault()
         if (settings.workspace === 'quiz') return
+        if (settings.workspace === 'name') {
+          if (!nameView) return
+          engine.setPerformance(namePerformance(nameView.trial, hearArpeggio))
+          void engine.play()
+          return
+        }
         void engine.toggle()
       } else if (event.key === 'Escape') {
         engine.stop()
@@ -94,7 +131,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [engine, settings.workspace])
+  }, [engine, hearArpeggio, nameView, settings.workspace])
 
   const coverMatches = cover.workspace === settings.workspace
   const namesVisible = settings.workspace === 'practice' || (coverMatches && cover.progression)
@@ -179,6 +216,39 @@ export default function App() {
     setQuizRound((round) => round + 1)
   }
 
+  function answerName(answer: NameAnswer) {
+    setNameView((current) => {
+      if (!current || current.picked) return current
+      const right = answer === current.trial.answer
+      return {
+        ...current,
+        picked: answer,
+        correct: right,
+        score: {
+          answered: current.score.answered + 1,
+          correct: current.score.correct + (right ? 1 : 0),
+        },
+      }
+    })
+  }
+
+  function nextName() {
+    engine.stop()
+    setNameRound((round) => round + 1)
+  }
+
+  async function playName() {
+    if (!nameView) return
+    engine.setPerformance(namePerformance(nameView.trial, hearArpeggio))
+    await engine.play()
+  }
+
+  async function replayName() {
+    if (!nameView) return
+    engine.setPerformance(namePerformance(nameView.trial, hearArpeggio))
+    await engine.restart()
+  }
+
   async function playQuiz() {
     if (!quiz) return
     engine.setPerformance(quizPerformance(quiz.secret))
@@ -202,23 +272,34 @@ export default function App() {
       </header>
       <Transport
         frame={frame}
-        canPlay={settings.workspace === 'quiz' ? Boolean(quiz) : resolved.ok && voiced.length > 0}
+        canPlay={
+          settings.workspace === 'quiz' ? Boolean(quiz) : settings.workspace === 'name' ? Boolean(nameView) : resolved.ok && voiced.length > 0
+        }
         loop={settings.loop}
         onPrime={() => engine.prime()}
         onPlay={() => {
           if (settings.workspace === 'quiz') void playQuiz()
+          else if (settings.workspace === 'name') void playName()
           else void engine.play()
         }}
         onPause={() => engine.pause()}
         onStop={() => engine.stop()}
         onRestart={() => {
           if (settings.workspace === 'quiz') void replayQuiz()
+          else if (settings.workspace === 'name') void replayName()
           else void engine.restart()
         }}
         onLoop={() => patch({ loop: !settings.loop })}
       />
       <div className="tabs" role="tablist" aria-label="Workspace">
-          {(['practice', 'listen', 'quiz'] as const).map((workspace) => (
+          {(
+            [
+              ['name', 'Name the chord'],
+              ['practice', 'Practice'],
+              ['listen', 'Listen'],
+              ['quiz', 'Quiz'],
+            ] as const
+          ).map(([workspace, label]) => (
             <button
               key={workspace}
               type="button"
@@ -226,6 +307,9 @@ export default function App() {
               aria-selected={settings.workspace === workspace}
               data-testid={`workspace-${workspace}`}
               onClick={() => {
+                if (workspace !== settings.workspace && (workspace === 'name' || workspace === 'quiz' || settings.workspace === 'name' || settings.workspace === 'quiz')) {
+                  engine.stop()
+                }
                 if (workspace === 'quiz' && settings.workspace !== 'quiz') {
                   setQuizSession((session) => session + 1)
                   setQuizRound(0)
@@ -233,12 +317,38 @@ export default function App() {
                 patch({ workspace })
               }}
             >
-              {workspace === 'practice' ? 'Practice' : workspace === 'listen' ? 'Listen' : 'Quiz'}
+              {label}
             </button>
           ))}
       </div>
 
-      {settings.workspace === 'quiz' ? (
+      {settings.workspace === 'name' && nameView ? (
+        <div className="workspace">
+          <div className="stage-column">
+            <NameChordPanel
+              trial={nameView.trial}
+              picked={nameView.picked}
+              correct={nameView.correct}
+              score={nameView.score}
+              arpeggio={hearArpeggio}
+              onArpeggio={setHearArpeggio}
+              onAnswer={answerName}
+              onNext={nextName}
+              onReplay={() => void replayName()}
+              onPrime={() => engine.prime()}
+            />
+            <Piano
+              notes={frame.active}
+              scrollKey={nameView.trial.id}
+              caption={
+                frame.status === 'playing'
+                  ? 'Amber keys are the bass. Teal keys are the right hand. Lit keys are the notes sounding right now.'
+                  : 'Amber keys are the bass. Teal keys are the right hand. Nothing lights until a note is actually sounding.'
+              }
+            />
+          </div>
+        </div>
+      ) : settings.workspace === 'quiz' ? (
         quiz ? (
           <QuizPanel
             question={quiz.publicQuestion}
